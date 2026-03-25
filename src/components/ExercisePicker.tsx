@@ -4,7 +4,7 @@ import { formatTimeAgo } from '../lib/timeHelper';
 
 interface ExercisePickerProps {
   exercises: Exercise[];
-  currentId: string;
+  currentId?: string;
   progressData: Record<string, ProgressRecord>;
   onSelect: (exercise: Exercise) => void;
 }
