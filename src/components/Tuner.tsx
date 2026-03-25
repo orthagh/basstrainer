@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export interface TunerProps {
-  currentPitch: PitchResult | null;
+  currentPitch?: PitchResult | null;
 }
 
 type Tuning = {
