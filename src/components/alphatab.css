@@ -1,18 +1,26 @@
-/* AlphaTab cursor / highlight styles */
+/* AlphaTab cursor / highlight styles — orange accent */
 .at-cursor-bar {
-  background: rgba(14, 165, 233, 0.08);
+  background: rgba(234, 120, 30, 0.08);
 }
 
 .at-selection div {
-  background: rgba(14, 165, 233, 0.15);
+  background: rgba(234, 120, 30, 0.15);
 }
 
 .at-cursor-beat {
-  background: rgba(14, 165, 233, 0.75);
+  background: rgba(234, 120, 30, 0.75);
   width: 3px;
 }
 
 .at-highlight * {
-  fill: #0ea5e9;
-  stroke: #0ea5e9;
+  fill: #ea781e;
+  stroke: #ea781e;
+}
+
+/* Note evaluation feedback overlay */
+@keyframes note-eval-appear {
+  from { opacity: 0; }
+}
+.note-eval-indicator {
+  animation: note-eval-appear 0.25s ease-out;
 }

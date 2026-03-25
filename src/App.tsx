@@ -1,13 +1,23 @@
-import { useState, useRef, useCallback } from 'react';
-import { Settings, Activity, Mic, MicOff } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Keyboard, RotateCcw } from 'lucide-react';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import AlphaTabView from './components/AlphaTabView';
+import type { AlphaTabHandle } from './components/AlphaTabView';
 import ExercisePicker from './components/ExercisePicker';
-import EvaluationPanel from './components/EvaluationPanel';
+import PostExerciseSummary from './components/PostExerciseSummary';
 import { exercises } from './data/exercises';
 import { useAudioInput } from './hooks/useAudioInput';
+import { useDemoMode } from './hooks/useDemoMode';
+import { useProgress } from './hooks/useProgress';
 import { useEvaluation } from './hooks/useEvaluation';
-import { midiToNoteName } from './audio/pitchDetector';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import type { TimedNote } from './audio/noteExtractor';
+import type { MetronomeConfig } from './components/MetronomeSettings';
 import './components/alphatab.css';
 
 function App() {
@@ -15,10 +25,54 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [noteData, setNoteData] = useState<TimedNote[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [evaluationEnabled, setEvaluationEnabled] = useState(true);
   const scorePositionRef = useRef(0);
 
+  // Metronome config — lifted here so evaluation can read count-in state
+  const [metronomeConfig, setMetronomeConfig] = useState<MetronomeConfig>({
+    enabled: true,
+    countInBars: 1,
+    clickSound: 'default',
+    accentFirstBeat: true,
+  });
+
+  // Fullscreen state
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const mainRef = useRef<HTMLDivElement>(null);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      mainRef.current?.requestFullscreen().then(() => setIsFullscreen(true));
+    } else {
+      document.exitFullscreen().then(() => setIsFullscreen(false));
+    }
+  }, []);
+
+  // Listen for external fullscreen changes (e.g. Esc key exits fullscreen)
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
+
+  // AlphaTab imperative ref (for keyboard shortcuts)
+  const alphaTabRef = useRef<AlphaTabHandle>(null);
+  const progress = useProgress();
+
   const audio = useAudioInput();
+
+  // Demo mode — simulate mic input for testing visual feedback without a bass
+  const [demoMode, setDemoMode] = useState(false);
+  const demo = useDemoMode({
+    expectedNotes: noteData,
+    isPlaying,
+    enabled: demoMode,
+    scorePositionRef,
+  });
+
+  // Effective audio signals: demo overrides real mic when active
+  const effectiveListening = demoMode || audio.isListening;
+  const effectiveLastNote = demoMode ? demo.lastNote : audio.lastNote;
+  const effectivePitch = demoMode ? demo.currentPitch : audio.currentPitch;
 
   // Callbacks for AlphaTabView (stable refs — no re-renders)
   const handlePlayStateChange = useCallback((playing: boolean) => {
@@ -29,161 +83,219 @@ function App() {
     scorePositionRef.current = ms;
   }, []);
 
-  // Evaluation hook — only active when enabled + mic on + playing
+  // Evaluation hook — only active when enabled + mic/demo on + playing
+  const [previousBest, setPreviousBest] = useState<number | null>(null);
+
   const evaluation = useEvaluation({
     expectedNotes: noteData,
     isPlaying,
-    isListening: audio.isListening,
-    evaluationEnabled,
-    lastDetectedNote: audio.lastNote,
+    isListening: effectiveListening,
+    evaluationEnabled: true,
+    lastDetectedNote: effectiveLastNote,
     scorePositionRef,
   });
 
+  // Save progress when an evaluation finishes
+  useEffect(() => {
+    if (evaluation.summary) {
+      setPreviousBest(prev => {
+        if (prev === null) {
+          return progress.progressData[currentExercise.id]?.bestScore ?? null;
+        }
+        return prev;
+      });
+      const bestScoreBpm = alphaTabRef.current?.getTempo() ?? 0;
+      progress.saveProgress({
+        exerciseId: currentExercise.id,
+        bestScore: evaluation.summary.accuracy,
+        bestTimingScore: evaluation.summary.grooveLock,
+        bestPitchScore: evaluation.summary.pitchAccuracy,
+        bestScoreBpm,
+        highestBpm: bestScoreBpm,
+        lastPlayedAt: new Date().toISOString(),
+      });
+    } else {
+      setPreviousBest(null);
+    }
+  }, [evaluation.summary, currentExercise.id, progress.saveProgress, progress.progressData]);
+
+  // ── Next exercise (if available) ───────────────────
+  const currentIndex = exercises.findIndex((e) => e.id === currentExercise.id);
+  const nextExercise = currentIndex < exercises.length - 1 ? exercises[currentIndex + 1] : null;
+
+  const handleRetry = useCallback(() => {
+    evaluation.dismissSummary();
+    // Stop then play again after a tick so AlphaTab resets position
+    alphaTabRef.current?.stop();
+    setTimeout(() => alphaTabRef.current?.playPause(), 50);
+  }, [evaluation]);
+
+  const handleNextExercise = useCallback(() => {
+    if (nextExercise) {
+      evaluation.dismissSummary();
+      setCurrentExercise(nextExercise);
+    }
+  }, [nextExercise, evaluation]);
+
+  // ── Keyboard shortcuts ────────────────────────────
+  useKeyboardShortcuts({
+    enabled: true,
+    playPause: () => alphaTabRef.current?.playPause(),
+    stop: () => alphaTabRef.current?.stop(),
+    toggleLoop: () => alphaTabRef.current?.toggleLoop(),
+    toggleMetronome: () =>
+      setMetronomeConfig((c) => ({ ...c, enabled: !c.enabled })),
+    toggleFullscreen,
+    tempoChange: (delta) => alphaTabRef.current?.changeTempo(delta),
+  });
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 py-4 px-6 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="bg-sky-500 text-white p-2 rounded-lg">
-            <Activity size={24} />
-          </div>
-          <h1 className="text-xl font-bold text-slate-800 tracking-tight">
-            Bass Groove Trainer
-          </h1>
-        </div>
-        <button
-          onClick={() => setSidebarOpen((v) => !v)}
-          className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors"
-        >
-          <Settings size={20} />
-        </button>
-      </header>
-
-      {/* Main Content Layout */}
-      <main className="flex-1 flex w-full max-w-[1600px] mx-auto p-4 md:p-6 gap-6 min-h-0">
-
-        {/* Exercise Picker Sidebar */}
-        {sidebarOpen && (
-          <aside className="w-72 shrink-0 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 overflow-y-auto">
-            <h3 className="font-semibold text-slate-800 mb-3 text-sm">Exercises</h3>
-            <ExercisePicker
-              exercises={exercises}
-              currentId={currentExercise.id}
-              onSelect={(ex) => setCurrentExercise(ex)}
-            />
-          </aside>
-        )}
-
-        {/* Center: Practice Area */}
-        <section className="flex-1 flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-0">
-          <AlphaTabView
-            key={currentExercise.id}
-            exercise={currentExercise}
-            onNoteDataExtracted={(notes) => setNoteData(notes)}
-            onPlayStateChange={handlePlayStateChange}
-            onPositionChange={handlePositionChange}
-          />
-        </section>
-
-        {/* Right Side: Feedback / Stats Sidebar */}
-        <aside className="w-72 flex flex-col gap-6 shrink-0">
-
-          {/* Realtime Feedback */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-slate-800">Live Feedback</h3>
-              <button
-                onClick={audio.toggle}
-                className={`p-2 rounded-lg transition-colors ${
-                  audio.isListening
-                    ? 'bg-red-100 text-red-600 hover:bg-red-200'
-                    : 'bg-sky-100 text-sky-600 hover:bg-sky-200'
-                }`}
-                title={audio.isListening ? 'Stop listening' : 'Start listening'}
-              >
-                {audio.isListening ? <MicOff size={18} /> : <Mic size={18} />}
-              </button>
+    <TooltipProvider>
+      <div ref={mainRef} className="h-screen bg-background flex flex-col overflow-hidden">
+        {/* Header */}
+        <header className="bg-card border-b border-border py-4 px-6 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary text-primary-foreground p-2 rounded-lg">
+              <Activity size={24} />
             </div>
-
-            {/* Error message */}
-            {audio.error && (
-              <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">
-                {audio.error}
-              </div>
-            )}
-
-            {/* Pitch display */}
-            <div className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-              {audio.isListening ? (
-                <>
-                  {/* Level meter */}
-                  <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden mb-3">
-                    <div
-                      className="h-full bg-emerald-400 transition-all duration-100 rounded-full"
-                      style={{ width: `${Math.min(audio.currentPitch.rms * 500, 100)}%` }}
-                    />
-                  </div>
-
-                  {/* Detected note */}
-                  <div className="text-3xl font-bold text-slate-800 mb-1 tabular-nums">
-                    {audio.currentPitch.noteName ?? '—'}
-                  </div>
-                  <div className="text-xs text-slate-400 font-mono tabular-nums mb-3">
-                    {audio.currentPitch.frequency
-                      ? `${audio.currentPitch.frequency.toFixed(1)} Hz`
-                      : '…'}
-                  </div>
-
-                  {/* Last detected notes */}
-                  {audio.detectedNotes.length > 0 && (
-                    <div className="w-full">
-                      <div className="text-[10px] text-slate-400 uppercase tracking-wider mb-1.5">
-                        Recent notes
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {audio.detectedNotes.slice(-12).map((n, i) => (
-                          <span
-                            key={i}
-                            className="px-1.5 py-0.5 bg-sky-100 text-sky-700 rounded text-xs font-mono"
-                          >
-                            {midiToNoteName(n.midi)}
-                          </span>
-                        ))}
-                      </div>
+            <h1 className="text-xl font-bold text-foreground tracking-tight">
+              Bass Groove Trainer
+            </h1>
+          </div>
+          <div className="flex items-center gap-1">
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors"
+                  title="Keyboard shortcuts"
+                >
+                  <Keyboard size={20} />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-4" align="end" sideOffset={8}>
+                <h4 className="text-sm font-semibold text-foreground mb-3">Keyboard Shortcuts</h4>
+                <div className="space-y-2 text-xs">
+                  {[
+                    ['Space', 'Play / Pause'],
+                    ['Escape', 'Stop'],
+                    ['L', 'Toggle loop'],
+                    ['M', 'Toggle metronome'],
+                    ['F', 'Fullscreen'],
+                    ['← / →', 'Tempo ±5 BPM'],
+                    ['↑ / ↓', 'Tempo ±1 BPM'],
+                  ].map(([key, desc]) => (
+                    <div key={key} className="flex items-center justify-between gap-2">
+                      <span className="text-muted-foreground">{desc}</span>
+                      <kbd className="px-1.5 py-0.5 bg-muted border border-border rounded text-[10px] font-mono text-foreground">
+                        {key}
+                      </kbd>
                     </div>
-                  )}
-                </>
-              ) : (
-                <>
-                  <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center mb-3">
-                    <Mic size={20} className="text-slate-400" />
-                  </div>
-                  <p className="text-sm text-slate-500 text-center">
-                    Click the mic to start listening
-                  </p>
-                </>
-              )}
-            </div>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <button
+              onClick={toggleFullscreen}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors"
+              title={isFullscreen ? 'Exit fullscreen (F)' : 'Fullscreen (F)'}
+            >
+              {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
+            </button>
           </div>
+        </header>
 
-          {/* Evaluation Panel */}
-          <EvaluationPanel
-            evaluationEnabled={evaluationEnabled}
-            setEvaluationEnabled={setEvaluationEnabled}
-            isActive={evaluation.isActive}
-            isListening={audio.isListening}
-            toleranceLevel={evaluation.toleranceLevel}
-            changeTolerance={evaluation.changeTolerance}
-            latencyMs={evaluation.latencyMs}
-            changeLatency={evaluation.changeLatency}
-            liveResults={evaluation.liveResults}
-            lastEvaluation={evaluation.lastEvaluation}
+        {/* Main Content Layout */}
+        <div className="flex-1 flex min-h-0 overflow-hidden relative">
+
+          {/* Exercise Picker Sidebar — flush left */}
+          {sidebarOpen ? (
+            <>
+              {/* Overlay for mobile (hidden on desktop) */}
+              <div 
+                className="sm:hidden fixed inset-0 bg-black/50 z-30 animate-in fade-in"
+                onClick={() => setSidebarOpen(false)}
+                aria-hidden="true"
+              />
+              <aside className="w-full sm:w-64 shrink-0 bg-card border-r border-border flex flex-col overflow-hidden absolute inset-0 z-40 sm:relative sm:inset-auto shadow-2xl sm:shadow-none animate-in slide-in-from-left duration-200">
+                <div className="flex items-center justify-between px-3 pt-3 pb-2 shrink-0 border-b border-border/50 sm:border-none">
+                  <h3 className="font-semibold text-foreground text-sm">Exercises</h3>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        if (confirm('Are you sure you want to reset all progress?')) {
+                          progress.clearProgress();
+                        }
+                      }}
+                      className="p-1 text-muted-foreground hover:text-rose-400 hover:bg-muted rounded transition-colors"
+                      title="Reset all progress"
+                    >
+                      <RotateCcw size={16} />
+                    </button>
+                    <button
+                      onClick={() => setSidebarOpen(false)}
+                      className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                      title="Collapse sidebar"
+                    >
+                      <PanelLeftClose size={16} />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto px-2 pb-2 scrollbar-autohide">
+                  <ExercisePicker
+                    exercises={exercises}
+                    currentId={currentExercise.id}
+                    progressData={progress.progressData}
+                    onSelect={(ex) => setCurrentExercise(ex)}
+                  />
+                </div>
+              </aside>
+            </>
+          ) : (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="shrink-0 self-start m-2 p-2 bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors rounded-lg"
+              title="Show exercises"
+            >
+              <PanelLeftOpen size={20} />
+            </button>
+          )}
+
+          {/* Center: Practice Area */}
+          <section className="flex-1 flex flex-col bg-card overflow-hidden min-h-0 min-w-0">
+            <AlphaTabView
+              ref={alphaTabRef}
+              key={currentExercise.id}
+              exercise={currentExercise}
+              metronomeConfig={metronomeConfig}
+              onMetronomeConfigChange={setMetronomeConfig}
+              onNoteDataExtracted={(notes) => setNoteData(notes)}
+              onPlayStateChange={handlePlayStateChange}
+              onPositionChange={handlePositionChange}
+              isListening={effectiveListening}
+              currentPitch={effectivePitch}
+              onToggleMic={audio.toggle}
+              latencyMs={evaluation.latencyMs}
+              onLatencyChange={evaluation.changeLatency}
+              noteEvaluations={evaluation.evaluations}
+              demoMode={demoMode}
+              onToggleDemo={() => setDemoMode(d => !d)}
+            />
+          </section>
+        </div>
+
+        {/* Post-exercise summary overlay */}
+        {evaluation.summary && (
+          <PostExerciseSummary
             summary={evaluation.summary}
-            dismissSummary={evaluation.dismissSummary}
+            exerciseTitle={currentExercise.title}
+            personalBest={previousBest}
+            onDismiss={evaluation.dismissSummary}
+            onRetry={handleRetry}
+            onNextExercise={nextExercise ? handleNextExercise : null}
           />
-        </aside>
-      </main>
-    </div>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }
 

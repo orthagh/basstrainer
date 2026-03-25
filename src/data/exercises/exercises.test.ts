@@ -36,7 +36,8 @@ describe('exercises data integrity', () => {
   it('every exercise has a valid AlphaTex header', () => {
     for (const ex of exercises) {
       expect(ex.tex, `${ex.id} missing \\instrument`).toContain('\\instrument 34');
-      expect(ex.tex, `${ex.id} missing \\tuning`).toContain('\\tuning e1 a1 d2 g2');
+      expect(ex.tex, `${ex.id} missing \\tuning`).toContain('\\tuning g2 d2 a1 e1');
+      expect(ex.tex, `${ex.id} missing \\clef`).toContain('\\clef F4');
       expect(ex.tex, `${ex.id} missing \\ts`).toContain('\\ts 4 4');
       expect(ex.tex, `${ex.id} missing \\tempo`).toContain('\\tempo');
     }

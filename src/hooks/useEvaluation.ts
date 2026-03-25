@@ -54,6 +54,8 @@ export interface UseEvaluationReturn {
   liveResults: LiveResults;
   /** Last per-note evaluation result (for instant feedback). */
   lastEvaluation: NoteEvaluation | null;
+  /** All per-note evaluations so far (for visual overlay). */
+  evaluations: NoteEvaluation[];
   /** Post-session summary (null if no completed session yet). */
   summary: EvaluationSummary | null;
   /** Dismiss the summary overlay. */
@@ -98,6 +100,7 @@ export function useEvaluation(
   });
   const [lastEvaluation, setLastEvaluation] =
     useState<NoteEvaluation | null>(null);
+  const [evaluations, setEvaluations] = useState<NoteEvaluation[]>([]);
   const [summary, setSummary] = useState<EvaluationSummary | null>(null);
 
   // ── Playback state transitions ──────────────────────────
@@ -117,6 +120,7 @@ export function useEvaluation(
         lastProcessedNoteRef.current = null;
         setSummary(null);
         setLastEvaluation(null);
+        setEvaluations([]);
         setLiveResults({
           hits: 0,
           misses: 0,
@@ -153,6 +157,7 @@ export function useEvaluation(
     );
     if (result) {
       setLastEvaluation(result);
+      setEvaluations(prev => [...prev, result]);
     }
   }, [lastDetectedNote, isActive, scorePositionRef]);
 
@@ -163,7 +168,10 @@ export function useEvaluation(
     const interval = setInterval(() => {
       if (!engineRef.current) return;
       const position = scorePositionRef.current;
-      engineRef.current.checkMissedNotes(position);
+      const missed = engineRef.current.checkMissedNotes(position);
+      if (missed.length > 0) {
+        setEvaluations(prev => [...prev, ...missed]);
+      }
 
       setLiveResults({
         hits: engineRef.current.hitCount,
@@ -182,6 +190,7 @@ export function useEvaluation(
     setIsActive(false);
     setLiveResults({ hits: 0, misses: 0, total: 0, accuracy: 0 });
     setLastEvaluation(null);
+    setEvaluations([]);
     setSummary(null);
   }, [expectedNotes]);
 
@@ -211,6 +220,7 @@ export function useEvaluation(
     changeLatency,
     liveResults,
     lastEvaluation,
+    evaluations,
     summary,
     dismissSummary,
   };
