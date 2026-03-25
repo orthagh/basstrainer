@@ -62,7 +62,7 @@ export class PitchDetector {
     // Threshold: lower = more selective (fewer false positives).
     this.detect = YIN({
       sampleRate,
-      threshold: 0.15,
+      threshold: 0.2, // Increased slightly from 0.15 for better bass harmonic handling
       probabilityThreshold: 0.1,
     });
   }
@@ -80,6 +80,7 @@ export class PitchDetector {
 
     const frequency = this.detect(buffer);
 
+    // Note: B0 string is ~30.87 Hz, Standard E1 is ~41.20 Hz.
     if (frequency == null || frequency < 20 || frequency > 1200) {
       // Out of bass range or no pitch found
       return { frequency: null, midi: null, noteName: null, rms };

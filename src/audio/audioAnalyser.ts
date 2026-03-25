@@ -68,7 +68,9 @@ export class AudioAnalyser {
   async start(): Promise<void> {
     if (this._isRunning) return;
 
-    await this.capture.start({ fftSize: 2048 });
+    // Use a larger FFT size (4096 or 8192) to reliably capture low bass frequencies 
+    // down to 30Hz (B0). A 2048 buffer is too short to correlate low frequencies!
+    await this.capture.start({ fftSize: 8192 });
 
     this.pitchDetector = new PitchDetector(this.capture.sampleRate);
     this.onsetDetector.reset();
