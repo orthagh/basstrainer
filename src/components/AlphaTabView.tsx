@@ -109,7 +109,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
 
     const api = new AlphaTabApi(containerRef.current, {
       core: {
-        fontDirectory: '/font/',
+        fontDirectory: import.meta.env.BASE_URL + 'font/',
         tex: true,
       },
       display: {
@@ -121,7 +121,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
         enablePlayer: true,
         enableCursor: true,
         enableUserInteraction: true,
-        soundFont: '/soundfont/sonivox.sf2',
+        soundFont: import.meta.env.BASE_URL + 'soundfont/sonivox.sf2',
         outputMode: 1, // WebAudioScriptProcessor — bypass AudioWorklet (Vite 8 compat)
         scrollElement: viewportRef.current!,
         scrollOffsetX: -30,
