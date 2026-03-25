@@ -1,0 +1,18 @@
+/* AlphaTab cursor / highlight styles */
+.at-cursor-bar {
+  background: rgba(14, 165, 233, 0.08);
+}
+
+.at-selection div {
+  background: rgba(14, 165, 233, 0.15);
+}
+
+.at-cursor-beat {
+  background: rgba(14, 165, 233, 0.75);
+  width: 3px;
+}
+
+.at-highlight * {
+  fill: #0ea5e9;
+  stroke: #0ea5e9;
+}
