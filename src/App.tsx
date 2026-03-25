@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Keyboard, RotateCcw } from 'lucide-react';
+import { Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Keyboard, RotateCcw, Info } from 'lucide-react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
   Popover,
@@ -10,6 +10,7 @@ import AlphaTabView from './components/AlphaTabView';
 import type { AlphaTabHandle } from './components/AlphaTabView';
 import ExercisePicker from './components/ExercisePicker';
 import PostExerciseSummary from './components/PostExerciseSummary';
+import WelcomeModal from './components/WelcomeModal';
 import { exercises } from './data/exercises';
 import { useAudioInput } from './hooks/useAudioInput';
 import { useDemoMode } from './hooks/useDemoMode';
@@ -149,6 +150,16 @@ function App() {
     tempoChange: (delta) => alphaTabRef.current?.changeTempo(delta),
   });
 
+  // ── Welcome Modal ────────────────────────────
+  const [showWelcome, setShowWelcome] = useState(() => {
+    return localStorage.getItem('groovetrainer_welcomed') !== 'true';
+  });
+
+  const handleCloseWelcome = useCallback(() => {
+    localStorage.setItem('groovetrainer_welcomed', 'true');
+    setShowWelcome(false);
+  }, []);
+
   return (
     <TooltipProvider>
       <div ref={mainRef} className="h-screen bg-background flex flex-col overflow-hidden">
@@ -163,6 +174,13 @@ function App() {
             </h1>
           </div>
           <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShowWelcome(true)}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors hidden sm:block"
+              title="About Bass Groove Trainer"
+            >
+              <Info size={20} />
+            </button>
             <Popover>
               <PopoverTrigger asChild>
                 <button
@@ -294,6 +312,9 @@ function App() {
             onNextExercise={nextExercise ? handleNextExercise : null}
           />
         )}
+
+        {/* Welcome Modal Splash Screen */}
+        <WelcomeModal isOpen={showWelcome} onClose={handleCloseWelcome} />
       </div>
     </TooltipProvider>
   );
