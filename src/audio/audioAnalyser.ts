@@ -58,7 +58,8 @@ export class AudioAnalyser {
 
   constructor(callbacks: AudioAnalyserCallbacks = {}) {
     this.capture = new AudioCapture();
-    this.onsetDetector = new OnsetDetector();
+    // Lower minLevel and onset threshold so quieter sources trigger notes
+    this.onsetDetector = new OnsetDetector({ minLevel: 0.003, threshold: 1.5 });
     this.callbacks = callbacks;
   }
 
@@ -72,7 +73,8 @@ export class AudioAnalyser {
     // down to 30Hz (B0). A 2048 buffer is too short to correlate low frequencies!
     await this.capture.start({ fftSize: 8192 });
 
-    this.pitchDetector = new PitchDetector(this.capture.sampleRate);
+    // Pass a lower silence threshold (0.003) so quieter sounds still get pitch tracked
+    this.pitchDetector = new PitchDetector(this.capture.sampleRate, 0.003);
     this.onsetDetector.reset();
     this.detectedNotes.length = 0;
     this.startTime = this.capture.currentTime();

@@ -654,7 +654,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
                     )}
 
                     {/* Tuner */}
-                    <div className="pt-2 border-t border-border">
+                      <div className="pt-2">
                       <Tuner currentPitch={currentPitch} />
                     </div>
                   </div>

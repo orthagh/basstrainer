@@ -98,20 +98,10 @@ export default function Tuner({ currentPitch }: TunerProps) {
     };
   }, [currentPitch, tuning, tuningKey]);
 
-  // Visuals for the tuner needle
-  // Clamp cents between -50 and 50 for display
-  const clampedCents = Math.max(-50, Math.min(50, cents));
-  // Map -50..+50 to 0..100% position
-  const needleLeft = `${50 + clampedCents}%`;
-
-  const isTuned = Math.abs(cents) < 5; // within 5 cents is "in tune"
+  // within 5 cents is "in tune"
+  const isTuned = Math.abs(cents) < 5;
   const isTooSharp = cents >= 5;
   const isTooFlat = cents <= -5;
-
-  let statusColor = 'bg-muted';
-  if (currentPitch?.frequency) {
-    statusColor = isTuned ? 'bg-emerald-500' : isTooSharp ? 'bg-rose-500' : 'bg-amber-500';
-  }
 
   return (
     <div className="bg-muted/30 p-3 rounded-lg border border-border space-y-4">
@@ -132,7 +122,7 @@ export default function Tuner({ currentPitch }: TunerProps) {
       </div>
 
       <div className="flex flex-col items-center gap-1">
-        <div className="text-2xl font-bold font-mono tracking-tighter text-foreground h-8 flex items-center">
+        <div className="text-3xl font-bold font-mono tracking-tighter text-foreground h-10 flex items-center">
           {targetName}
         </div>
         <div className="text-[10px] text-muted-foreground font-mono h-4 whitespace-pre">
@@ -140,28 +130,79 @@ export default function Tuner({ currentPitch }: TunerProps) {
         </div>
       </div>
 
-      <div className="relative w-full h-8 flex items-center justify-center">
-        {/* Track */}
-        <div className="absolute w-full h-1 bg-muted rounded-full overflow-hidden">
-          <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-foreground/20 -translate-x-1/2" />
+      <div className="relative w-full flex flex-col items-center justify-center gap-2 pt-2 pb-1">
+        
+        {/* Tuning Direction Arrows & Lights */}
+        <div className="flex items-center justify-between w-full px-6 text-xs">
+          {/* Flat indicator */}
+          <div className={`text-xl -mt-1 transition-colors ${currentPitch?.frequency && isTooFlat ? 'text-amber-500 drop-shadow-[0_0_5px_rgba(245,158,11,0.8)]' : 'text-muted-foreground/20'}`}>
+            ◀
+          </div>
+          
+          {/* Tuned indicator */}
+          <div className={`w-3 h-3 rounded-full transition-colors ${currentPitch?.frequency && isTuned ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,1)]' : 'bg-muted-foreground/20'}`} />
+          
+          {/* Sharp indicator */}
+          <div className={`text-xl -mt-1 transition-colors ${currentPitch?.frequency && isTooSharp ? 'text-amber-500 drop-shadow-[0_0_5px_rgba(245,158,11,0.8)]' : 'text-muted-foreground/20'}`}>
+            ▶
+          </div>
+        </div>
+
+        {/* LED Bars */}
+        <div className="flex items-end justify-center gap-[3px] h-12 w-full mt-2">
+           {Array.from({ length: 21 }).map((_, i) => {
+              const distance = Math.abs(i - 10);
+              // Calculate height curve: center is tallest (36px), edges are shortest (8px)
+              const maxH = 36;
+              const minH = 8;
+              const h = maxH - (distance / 10) * (maxH - minH);
+              
+              let isLit = false;
+              let isBloom = false;
+              let color = 'bg-muted-foreground/10'; // completely unlit background
+              
+              if (currentPitch?.frequency) {
+                 // Clamp cents between -50 and 50
+                 const clampedCents = Math.max(-50, Math.min(50, cents));
+                 // Center is 10. Map roughly 5 cents per LED.
+                 // -50 -> 0 ... 0 -> 10 ... +50 -> 20
+                 const activeIndex = Math.round(clampedCents / 5) + 10;
+                 
+                 if (i === activeIndex) {
+                   isLit = true;
+                 } else if (Math.abs(i - activeIndex) === 1) {
+                   isBloom = true;
+                 }
+
+                 if (isLit) {
+                    color = isTuned ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,1)]' : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,1)]';
+                 } else if (isBloom) {
+                    color = isTuned ? 'bg-emerald-500/50' : 'bg-amber-500/50';
+                 }
+              }
+              
+              // Render the center dot slightly visible when idle, to give orientation
+              if (!isLit && !isBloom && i === 10) {
+                 color = 'bg-muted-foreground/30';
+              }
+
+              return (
+                 <div 
+                   key={i} 
+                   className={`w-1.5 rounded-sm transition-all duration-75 ${color}`} 
+                   style={{ height: `${h}px` }} 
+                 />
+              );
+           })}
         </div>
         
-        {/* Tick marks */}
-        <div className="absolute w-full flex justify-between px-1 top-0 text-[8px] text-muted-foreground/50">
+        {/* Tick labels */}
+        <div className="w-full flex justify-between px-1 mt-1 text-[9px] text-muted-foreground/50 font-mono">
           <span>-50</span>
           <span>0</span>
           <span>+50</span>
         </div>
 
-        {/* Needle */}
-        {currentPitch?.frequency && (
-          <div
-            className={`absolute top-0 bottom-0 w-1 flex flex-col items-center transition-all duration-75`}
-            style={{ left: needleLeft, transform: 'translateX(-50%)' }}
-          >
-            <div className={`w-0.5 h-full rounded-full ${statusColor}`} />
-          </div>
-        )}
       </div>
     </div>
   );
