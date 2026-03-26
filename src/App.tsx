@@ -26,8 +26,26 @@ import './components/alphatab.css';
 
 type AppView = 'trainer' | 'tuner' | 'metronome';
 
+const VIEWS: AppView[] = ['trainer', 'tuner', 'metronome'];
+
+function viewFromHash(): AppView {
+  const hash = window.location.hash.replace(/^#\/?/, '');
+  return (VIEWS as string[]).includes(hash) ? (hash as AppView) : 'trainer';
+}
+
 function App() {
-  const [currentView, setCurrentView] = useState<AppView>('trainer');
+  const [currentView, setCurrentView] = useState<AppView>(viewFromHash);
+
+  const navigateTo = useCallback((view: AppView) => {
+    window.location.hash = view;
+    setCurrentView(view);
+  }, []);
+
+  useEffect(() => {
+    const onHashChange = () => setCurrentView(viewFromHash());
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
   const [currentExercise, setCurrentExercise] = useState<Exercise | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [noteData, setNoteData] = useState<TimedNote[]>([]);
@@ -40,6 +58,7 @@ function App() {
     countInBars: 1,
     clickSound: 'default',
     accentFirstBeat: true,
+    volume: 1,
   });
 
   // Fullscreen state
@@ -194,7 +213,7 @@ function App() {
           {/* Center Navigation Menu */}
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setCurrentView('trainer')}
+              onClick={() => navigateTo('trainer')}
               className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors ${
                 currentView === 'trainer'
                   ? 'bg-primary/10 text-primary'
@@ -206,7 +225,7 @@ function App() {
               <span className="text-xs font-medium">Trainer</span>
             </button>
             <button
-              onClick={() => setCurrentView('tuner')}
+              onClick={() => navigateTo('tuner')}
               className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors ${
                 currentView === 'tuner'
                   ? 'bg-primary/10 text-primary'
@@ -218,7 +237,7 @@ function App() {
               <span className="text-xs font-medium">Tuner</span>
             </button>
             <button
-              onClick={() => setCurrentView('metronome')}
+              onClick={() => navigateTo('metronome')}
               className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors ${
                 currentView === 'metronome'
                   ? 'bg-primary/10 text-primary'
