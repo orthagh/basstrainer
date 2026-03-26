@@ -5,6 +5,25 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ── Global cursor conventions ── */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+select,
+label[for],
+summary,
+a[href] {
+  cursor: pointer;
+}
+button:disabled,
+[role="button"][aria-disabled="true"],
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+}
+
+@custom-variant dark (&:is(.dark *));
+
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: 'Geist Variable', sans-serif;
@@ -181,4 +200,14 @@
 }
 .scrollbar-autohide:hover::-webkit-scrollbar-thumb:hover {
   background: oklch(0.5 0 0 / 40%);
+}
+
+/* ── Tap-glow: BPM input glow on each tap ── */
+@keyframes tap-glow {
+  0%   { box-shadow: 0 0 0   0px color-mix(in oklch, var(--primary) 70%, transparent); }
+  40%  { box-shadow: 0 0 16px 6px color-mix(in oklch, var(--primary) 45%, transparent); }
+  100% { box-shadow: 0 0 0   0px color-mix(in oklch, var(--primary) 0%,  transparent); }
+}
+.tap-glow {
+  animation: tap-glow 0.6s ease-out forwards;
 }

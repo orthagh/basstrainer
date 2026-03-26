@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Keyboard, RotateCcw, Info, AudioLines } from 'lucide-react';
+import MetronomeIcon from './components/MetronomeIcon';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
   Popover,
@@ -12,6 +13,7 @@ import ExercisePicker from './components/ExercisePicker';
 import PostExerciseSummary from './components/PostExerciseSummary';
 import WelcomeModal from './components/WelcomeModal';
 import TunerPage from './components/TunerPage';
+import MetronomePage, { type MetronomeHandle } from './components/MetronomePage';
 import { exercises, type Exercise } from './data/exercises';
 import { useAudioInput } from './hooks/useAudioInput';
 import { useDemoMode } from './hooks/useDemoMode';
@@ -22,7 +24,7 @@ import type { TimedNote } from './audio/noteExtractor';
 import type { MetronomeConfig } from './components/MetronomeSettings';
 import './components/alphatab.css';
 
-type AppView = 'trainer' | 'tuner';
+type AppView = 'trainer' | 'tuner' | 'metronome';
 
 function App() {
   const [currentView, setCurrentView] = useState<AppView>('trainer');
@@ -61,6 +63,8 @@ function App() {
 
   // AlphaTab imperative ref (for keyboard shortcuts)
   const alphaTabRef = useRef<AlphaTabHandle>(null);
+  // Metronome page imperative ref (for keyboard shortcuts)
+  const metronomeRef = useRef<MetronomeHandle>(null);
   const progress = useProgress();
 
   const audio = useAudioInput();
@@ -145,13 +149,22 @@ function App() {
   // ── Keyboard shortcuts ────────────────────────────
   useKeyboardShortcuts({
     enabled: true,
-    playPause: () => alphaTabRef.current?.playPause(),
-    stop: () => alphaTabRef.current?.stop(),
+    playPause: () =>
+      currentView === 'metronome'
+        ? metronomeRef.current?.toggle()
+        : alphaTabRef.current?.playPause(),
+    stop: () =>
+      currentView === 'metronome'
+        ? metronomeRef.current?.stop()
+        : alphaTabRef.current?.stop(),
     toggleLoop: () => alphaTabRef.current?.toggleLoop(),
     toggleMetronome: () =>
       setMetronomeConfig((c) => ({ ...c, enabled: !c.enabled })),
     toggleFullscreen,
-    tempoChange: (delta) => alphaTabRef.current?.changeTempo(delta),
+    tempoChange: (delta) =>
+      currentView === 'metronome'
+        ? metronomeRef.current?.changeTempo(delta)
+        : alphaTabRef.current?.changeTempo(delta),
   });
 
   // ── Welcome Modal ────────────────────────────
@@ -169,7 +182,7 @@ function App() {
       <div ref={mainRef} className="h-screen bg-background flex flex-col overflow-hidden">
         {/* Header with Navigation */}
         <header className="bg-card border-b border-border py-4 px-6 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-1">
             <div className="bg-primary text-primary-foreground p-2 rounded-lg">
               <Activity size={24} />
             </div>
@@ -204,9 +217,21 @@ function App() {
               <AudioLines size={24} />
               <span className="text-xs font-medium">Tuner</span>
             </button>
+            <button
+              onClick={() => setCurrentView('metronome')}
+              className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors ${
+                currentView === 'metronome'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+              title="Metronome"
+            >
+              <MetronomeIcon size={24} />
+              <span className="text-xs font-medium">Metronome</span>
+            </button>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-1 justify-end">
             <button
               onClick={() => setShowWelcome(true)}
               className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors hidden sm:block"
@@ -365,6 +390,11 @@ function App() {
               audioStart={audio.start}
               audioError={audio.error}
             />
+          )}
+
+          {/* Metronome View */}
+          {currentView === 'metronome' && (
+            <MetronomePage ref={metronomeRef} />
           )}
         </div>
 

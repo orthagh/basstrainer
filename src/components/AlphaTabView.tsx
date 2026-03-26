@@ -373,7 +373,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
   const playClick = useCallback((accent: boolean) => {
     const cfg = metronomeConfigRef.current;
     if (!cfg.enabled) return;
-    synthClick(cfg.clickSound, accent && cfg.accentFirstBeat);
+    synthClick(cfg.clickSound, accent && cfg.accentFirstBeat, cfg.volume ?? 1);
   }, []);
 
   // Beat pulse — brief visual flash on each beat

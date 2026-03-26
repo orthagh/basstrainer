@@ -64,7 +64,7 @@ export default function BpmDisplay({
   );
 
   return (
-    <div className="flex items-center gap-1.5 select-none" role="group" aria-label="Tempo setting">
+    <div className="flex items-center gap-1.5 select-none bg-muted rounded-lg px-2 py-1.5" role="group" aria-label="Tempo setting">
       {/* −1 button */}
       <button
         onClick={() => nudge(-1)}

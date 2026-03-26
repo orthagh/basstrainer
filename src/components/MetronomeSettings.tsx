@@ -35,6 +35,8 @@ export interface MetronomeConfig {
   countInBars: number;
   clickSound: ClickSound;
   accentFirstBeat: boolean;
+  /** 0–1 master volume for click sounds, default 1 */
+  volume: number;
 }
 
 const SOUND_LABELS: Record<ClickSound, string> = {
@@ -42,6 +44,7 @@ const SOUND_LABELS: Record<ClickSound, string> = {
   woodblock: 'Woodblock',
   rimshot: 'Rimshot',
   cowbell: 'Cowbell',
+  mechanical: 'Mechanical',
 };
 
 interface MetronomeSettingsProps {
@@ -155,6 +158,30 @@ export default function MetronomeSettings({
                 <Volume2 size={14} />
               </button>
             </div>
+          </div>
+
+          <Separator />
+
+          {/* Volume */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs flex items-center gap-1.5" htmlFor="click-volume">
+                <Volume2 size={12} />
+                Volume
+              </Label>
+              <span className="text-xs font-mono text-muted-foreground tabular-nums w-8 text-right">
+                {Math.round(config.volume * 100)}%
+              </span>
+            </div>
+            <Slider
+              id="click-volume"
+              min={0}
+              max={1}
+              step={0.05}
+              value={[config.volume]}
+              onValueChange={([v]) => update({ volume: v })}
+              disabled={!config.enabled}
+            />
           </div>
 
           <Separator />
