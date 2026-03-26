@@ -31,7 +31,7 @@ export default function TunerPage({ isListening: globalListening, currentPitch: 
   const currentPitch = globalPitch ?? null;
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8 bg-gradient-to-br from-background to-muted/50">
+    <div className="flex-1 flex flex-col items-center justify-start pt-12 p-8 bg-gradient-to-br from-background to-muted/50">
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="space-y-2 text-center">

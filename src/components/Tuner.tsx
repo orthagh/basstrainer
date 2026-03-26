@@ -131,7 +131,7 @@ export default function Tuner({ currentPitch }: TunerProps) {
   const isTuned = Math.abs(cents) < 5;
 
   return (
-    <div className="bg-muted/30 p-3 rounded-lg border border-border space-y-4">
+    <div className="bg-card p-3 rounded-lg border border-border space-y-4">
       <div className="flex items-center justify-center">
         <Select value={tuningKey} onValueChange={setTuningKey}>
           <SelectTrigger className="h-8 w-56 text-sm border-border bg-card">
