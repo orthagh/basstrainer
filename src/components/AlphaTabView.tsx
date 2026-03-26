@@ -13,7 +13,6 @@ import { playClick as synthClick } from '../audio/clickSynth';
 import MetronomeSettings, { type MetronomeConfig } from './MetronomeSettings';
 import BpmDisplay from './BpmDisplay';
 import MicFeedbackDisplay from './MicFeedbackDisplay';
-import Tuner from './Tuner';
 import type { PitchResult } from '../audio/pitchDetector';
 import {
   Popover,
@@ -655,8 +654,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
 
                     {/* Tuner */}
                       <div className="pt-2">
-                      <Tuner currentPitch={currentPitch} />
-                    </div>
+                      </div>
                   </div>
                 </PopoverContent>
               </Popover>

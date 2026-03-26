@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Keyboard, RotateCcw, Info } from 'lucide-react';
+import { Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Keyboard, RotateCcw, Info, AudioLines } from 'lucide-react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
   Popover,
@@ -11,6 +11,7 @@ import type { AlphaTabHandle } from './components/AlphaTabView';
 import ExercisePicker from './components/ExercisePicker';
 import PostExerciseSummary from './components/PostExerciseSummary';
 import WelcomeModal from './components/WelcomeModal';
+import TunerPage from './components/TunerPage';
 import { exercises, type Exercise } from './data/exercises';
 import { useAudioInput } from './hooks/useAudioInput';
 import { useDemoMode } from './hooks/useDemoMode';
@@ -21,7 +22,10 @@ import type { TimedNote } from './audio/noteExtractor';
 import type { MetronomeConfig } from './components/MetronomeSettings';
 import './components/alphatab.css';
 
+type AppView = 'trainer' | 'tuner';
+
 function App() {
+  const [currentView, setCurrentView] = useState<AppView>('trainer');
   const [currentExercise, setCurrentExercise] = useState<Exercise | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [noteData, setNoteData] = useState<TimedNote[]>([]);
@@ -163,7 +167,7 @@ function App() {
   return (
     <TooltipProvider>
       <div ref={mainRef} className="h-screen bg-background flex flex-col overflow-hidden">
-        {/* Header */}
+        {/* Header with Navigation */}
         <header className="bg-card border-b border-border py-4 px-6 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-3">
             <div className="bg-primary text-primary-foreground p-2 rounded-lg">
@@ -173,6 +177,35 @@ function App() {
               Bass Groove Trainer
             </h1>
           </div>
+
+          {/* Center Navigation Menu */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentView('trainer')}
+              className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors ${
+                currentView === 'trainer'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+              title="Groove Trainer"
+            >
+              <Activity size={24} />
+              <span className="text-xs font-medium">Trainer</span>
+            </button>
+            <button
+              onClick={() => setCurrentView('tuner')}
+              className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors ${
+                currentView === 'tuner'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+              title="Bass Tuner"
+            >
+              <AudioLines size={24} />
+              <span className="text-xs font-medium">Tuner</span>
+            </button>
+          </div>
+
           <div className="flex items-center gap-1">
             <button
               onClick={() => setShowWelcome(true)}
@@ -224,101 +257,115 @@ function App() {
 
         {/* Main Content Layout */}
         <div className="flex-1 flex min-h-0 overflow-hidden relative">
-
-          {/* Exercise Picker Sidebar — flush left */}
-          {sidebarOpen ? (
+          {/* Trainer View */}
+          {currentView === 'trainer' && (
             <>
-              {/* Overlay for mobile (hidden on desktop) */}
-              <div 
-                className="sm:hidden fixed inset-0 bg-black/50 z-30 animate-in fade-in"
-                onClick={() => setSidebarOpen(false)}
-                aria-hidden="true"
-              />
-              <aside className="w-full sm:w-64 shrink-0 bg-card border-r border-border flex flex-col overflow-hidden absolute inset-0 z-40 sm:relative sm:inset-auto shadow-2xl sm:shadow-none animate-in slide-in-from-left duration-200">
-                <div className="flex items-center justify-between px-3 pt-3 pb-2 shrink-0 border-b border-border/50 sm:border-none">
-                  <h3 className="font-semibold text-foreground text-sm">Exercises</h3>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => {
-                        if (confirm('Are you sure you want to reset all progress?')) {
-                          progress.clearProgress();
-                        }
-                      }}
-                      className="p-1 text-muted-foreground hover:text-rose-400 hover:bg-muted rounded transition-colors"
-                      title="Reset all progress"
-                    >
-                      <RotateCcw size={16} />
-                    </button>
-                    <button
-                      onClick={() => setSidebarOpen(false)}
-                      className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
-                      title="Collapse sidebar"
-                    >
-                      <PanelLeftClose size={16} />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex-1 overflow-y-auto px-2 pb-2 scrollbar-autohide">
-                  <ExercisePicker
-                    exercises={exercises}
-                    currentId={currentExercise?.id}
-                    progressData={progress.progressData}
-                    onSelect={(ex) => setCurrentExercise(ex)}
+              {/* Exercise Picker Sidebar — flush left */}
+              {sidebarOpen ? (
+                <>
+                  {/* Overlay for mobile (hidden on desktop) */}
+                  <div 
+                    className="sm:hidden fixed inset-0 bg-black/50 z-30 animate-in fade-in"
+                    onClick={() => setSidebarOpen(false)}
+                    aria-hidden="true"
                   />
-                </div>
-              </aside>
+                  <aside className="w-full sm:w-64 shrink-0 bg-card border-r border-border flex flex-col overflow-hidden absolute inset-0 z-40 sm:relative sm:inset-auto shadow-2xl sm:shadow-none animate-in slide-in-from-left duration-200">
+                    <div className="flex items-center justify-between px-3 pt-3 pb-2 shrink-0 border-b border-border/50 sm:border-none">
+                      <h3 className="font-semibold text-foreground text-sm">Exercises</h3>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => {
+                            if (confirm('Are you sure you want to reset all progress?')) {
+                              progress.clearProgress();
+                            }
+                          }}
+                          className="p-1 text-muted-foreground hover:text-rose-400 hover:bg-muted rounded transition-colors"
+                          title="Reset all progress"
+                        >
+                          <RotateCcw size={16} />
+                        </button>
+                        <button
+                          onClick={() => setSidebarOpen(false)}
+                          className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                          title="Collapse sidebar"
+                        >
+                          <PanelLeftClose size={16} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto px-2 pb-2 scrollbar-autohide">
+                      <ExercisePicker
+                        exercises={exercises}
+                        currentId={currentExercise?.id}
+                        progressData={progress.progressData}
+                        onSelect={(ex) => setCurrentExercise(ex)}
+                      />
+                    </div>
+                  </aside>
+                </>
+              ) : (
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="shrink-0 self-start m-2 p-2 bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors rounded-lg"
+                  title="Show exercises"
+                >
+                  <PanelLeftOpen size={20} />
+                </button>
+              )}
+
+              {/* Center: Practice Area */}
+              <section className="flex-1 flex flex-col bg-card overflow-hidden min-h-0 min-w-0">
+                {currentExercise ? (
+                  <AlphaTabView
+                    ref={alphaTabRef}
+                    key={currentExercise.id}
+                    exercise={currentExercise}
+                    metronomeConfig={metronomeConfig}
+                    onMetronomeConfigChange={setMetronomeConfig}
+                    onNoteDataExtracted={(notes) => setNoteData(notes)}
+                    onPlayStateChange={handlePlayStateChange}
+                    onPositionChange={handlePositionChange}
+                    isListening={effectiveListening}
+                    currentPitch={effectivePitch}
+                    onToggleMic={audio.toggle}
+                    latencyMs={evaluation.latencyMs}
+                    onLatencyChange={evaluation.changeLatency}
+                    noteEvaluations={evaluation.evaluations}
+                    demoMode={demoMode}
+                    onToggleDemo={() => setDemoMode(d => !d)}
+                  />
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground animate-in fade-in zoom-in-95 duration-300">
+                    <div className="bg-muted p-6 rounded-full mb-6">
+                      <Activity size={48} className="text-primary/50" />
+                    </div>
+                    <h2 className="text-2xl font-semibold text-foreground mb-3">Welcome to Bass Groove Trainer</h2>
+                    <p className="max-w-md text-sm leading-relaxed">
+                      Select an exercise from the sidebar to start practicing your bass skills.
+                    </p>
+                    {!sidebarOpen && (
+                      <button
+                        onClick={() => setSidebarOpen(true)}
+                        className="mt-8 px-6 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors font-medium"
+                      >
+                        Open Exercises
+                      </button>
+                    )}
+                  </div>
+                )}
+              </section>
             </>
-          ) : (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="shrink-0 self-start m-2 p-2 bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors rounded-lg"
-              title="Show exercises"
-            >
-              <PanelLeftOpen size={20} />
-            </button>
           )}
 
-          {/* Center: Practice Area */}
-          <section className="flex-1 flex flex-col bg-card overflow-hidden min-h-0 min-w-0">
-            {currentExercise ? (
-              <AlphaTabView
-                ref={alphaTabRef}
-                key={currentExercise.id}
-                exercise={currentExercise}
-                metronomeConfig={metronomeConfig}
-                onMetronomeConfigChange={setMetronomeConfig}
-                onNoteDataExtracted={(notes) => setNoteData(notes)}
-                onPlayStateChange={handlePlayStateChange}
-                onPositionChange={handlePositionChange}
-                isListening={effectiveListening}
-                currentPitch={effectivePitch}
-                onToggleMic={audio.toggle}
-                latencyMs={evaluation.latencyMs}
-                onLatencyChange={evaluation.changeLatency}
-                noteEvaluations={evaluation.evaluations}
-                demoMode={demoMode}
-                onToggleDemo={() => setDemoMode(d => !d)}
-              />
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground animate-in fade-in zoom-in-95 duration-300">
-                <div className="bg-muted p-6 rounded-full mb-6">
-                  <Activity size={48} className="text-primary/50" />
-                </div>
-                <h2 className="text-2xl font-semibold text-foreground mb-3">Welcome to Bass Groove Trainer</h2>
-                <p className="max-w-md text-sm leading-relaxed">
-                  Select an exercise from the sidebar to start practicing your bass skills.
-                </p>
-                {!sidebarOpen && (
-                  <button
-                    onClick={() => setSidebarOpen(true)}
-                    className="mt-8 px-6 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors font-medium"
-                  >
-                    Open Exercises
-                  </button>
-                )}
-              </div>
-            )}
-          </section>
+          {/* Tuner View */}
+          {currentView === 'tuner' && (
+            <TunerPage
+              isListening={audio.isListening}
+              currentPitch={audio.currentPitch}
+              audioStart={audio.start}
+              audioError={audio.error}
+            />
+          )}
         </div>
 
         {/* Post-exercise summary overlay */}

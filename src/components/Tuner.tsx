@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import type { PitchResult } from '../audio/pitchDetector';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 
 export interface TunerProps {
   currentPitch?: PitchResult | null;
@@ -13,8 +12,9 @@ type Tuning = {
 };
 
 const TUNINGS: Record<string, Tuning> = {
-  standard4: {
-    name: 'Standard (EADG)',
+  // ── Bass Tunings ──
+  bass_standard4: {
+    name: 'Bass - Standard (EADG)',
     notes: [
       { name: 'E1', freq: 41.20 },
       { name: 'A1', freq: 55.00 },
@@ -22,8 +22,8 @@ const TUNINGS: Record<string, Tuning> = {
       { name: 'G2', freq: 98.00 },
     ],
   },
-  dropD: {
-    name: 'Drop D (DADG)',
+  bass_dropD: {
+    name: 'Bass - Drop D (DADG)',
     notes: [
       { name: 'D1', freq: 36.71 },
       { name: 'A1', freq: 55.00 },
@@ -31,8 +31,8 @@ const TUNINGS: Record<string, Tuning> = {
       { name: 'G2', freq: 98.00 },
     ],
   },
-  standard5: {
-    name: '5-String (BEADG)',
+  bass_standard5: {
+    name: 'Bass - 5-String (BEADG)',
     notes: [
       { name: 'B0', freq: 30.87 },
       { name: 'E1', freq: 41.20 },
@@ -41,27 +41,58 @@ const TUNINGS: Record<string, Tuning> = {
       { name: 'G2', freq: 98.00 },
     ],
   },
+  // ── Guitar Tunings ──
+  guitar_standard: {
+    name: 'Guitar - Standard (EADGBE)',
+    notes: [
+      { name: 'E2', freq: 82.41 },
+      { name: 'A2', freq: 110.00 },
+      { name: 'D3', freq: 146.83 },
+      { name: 'G3', freq: 196.00 },
+      { name: 'B3', freq: 246.94 },
+      { name: 'E4', freq: 329.63 },
+    ],
+  },
+  guitar_dropD: {
+    name: 'Guitar - Drop D (DADGBE)',
+    notes: [
+      { name: 'D2', freq: 73.42 },
+      { name: 'A2', freq: 110.00 },
+      { name: 'D3', freq: 146.83 },
+      { name: 'G3', freq: 196.00 },
+      { name: 'B3', freq: 246.94 },
+      { name: 'E4', freq: 329.63 },
+    ],
+  },
+  guitar_halfStepDown: {
+    name: 'Guitar - Half Step Down (D#G#C#F#A#D#)',
+    notes: [
+      { name: 'D#2', freq: 77.78 },
+      { name: 'G#2', freq: 103.83 },
+      { name: 'C#3', freq: 138.59 },
+      { name: 'F#3', freq: 184.99 },
+      { name: 'A#3', freq: 233.08 },
+      { name: 'D#4', freq: 311.13 },
+    ],
+  },
   chromatic: {
     name: 'Chromatic',
-    notes: [], // Chromatic mode doesn't lock to specific strings
+    notes: [],
   },
 };
 
-/** Calculate cents difference between two frequencies */
 function getCents(freq: number, targetFreq: number): number {
   return 1200 * Math.log2(freq / targetFreq);
 }
 
-/** Get exact frequency of a MIDI note */
 function getMidiFreq(midi: number): number {
   return 440 * Math.pow(2, (midi - 69) / 12);
 }
 
 export default function Tuner({ currentPitch }: TunerProps) {
-  const [tuningKey, setTuningKey] = useState<keyof typeof TUNINGS>('standard4');
+  const [tuningKey, setTuningKey] = useState<keyof typeof TUNINGS>('bass_standard4');
   const tuning = TUNINGS[tuningKey];
 
-  // Derive target note and cents
   const { targetName, cents } = useMemo(() => {
     if (!currentPitch || !currentPitch.frequency) {
       return { targetName: '--', cents: 0 };
@@ -78,7 +109,6 @@ export default function Tuner({ currentPitch }: TunerProps) {
       };
     }
 
-    // Find the closest string in the selected tuning
     let closestString = tuning.notes[0];
     let minCentsAbs = Infinity;
     let closestCents = 0;
@@ -98,112 +128,120 @@ export default function Tuner({ currentPitch }: TunerProps) {
     };
   }, [currentPitch, tuning, tuningKey]);
 
-  // within 5 cents is "in tune"
   const isTuned = Math.abs(cents) < 5;
-  const isTooSharp = cents >= 5;
-  const isTooFlat = cents <= -5;
 
   return (
     <div className="bg-muted/30 p-3 rounded-lg border border-border space-y-4">
-      <div className="flex items-center justify-between">
-        <Label className="text-xs font-semibold text-foreground">Tuner</Label>
+      <div className="flex items-center justify-center">
         <Select value={tuningKey} onValueChange={setTuningKey}>
-          <SelectTrigger className="h-6 w-32 text-xs border-border bg-card">
+          <SelectTrigger className="h-8 w-56 text-sm border-border bg-card">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {Object.entries(TUNINGS).map(([key, t]) => (
-              <SelectItem key={key} value={key} className="text-xs">
-                {t.name}
-              </SelectItem>
-            ))}
+            <SelectGroup>
+              <SelectLabel className="text-xs font-semibold">Bass</SelectLabel>
+              {Object.entries(TUNINGS)
+                .filter(([key]) => key.startsWith('bass_'))
+                .map(([key, t]) => (
+                  <SelectItem key={key} value={key} className="text-sm">
+                    {t.name.replace('Bass - ', '')}
+                  </SelectItem>
+                ))}
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel className="text-xs font-semibold">Guitar</SelectLabel>
+              {Object.entries(TUNINGS)
+                .filter(([key]) => key.startsWith('guitar_'))
+                .map(([key, t]) => (
+                  <SelectItem key={key} value={key} className="text-sm">
+                    {t.name.replace('Guitar - ', '')}
+                  </SelectItem>
+                ))}
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel className="text-xs font-semibold">Other</SelectLabel>
+              {Object.entries(TUNINGS)
+                .filter(([key]) => !key.startsWith('bass_') && !key.startsWith('guitar_'))
+                .map(([key, t]) => (
+                  <SelectItem key={key} value={key} className="text-sm">
+                    {t.name}
+                  </SelectItem>
+                ))}
+            </SelectGroup>
           </SelectContent>
         </Select>
       </div>
 
-      <div className="flex flex-col items-center gap-1">
-        <div className="text-3xl font-bold font-mono tracking-tighter text-foreground h-10 flex items-center">
-          {targetName}
-        </div>
-        <div className="text-[10px] text-muted-foreground font-mono h-4 whitespace-pre">
-          {currentPitch?.frequency ? `${Math.abs(Math.round(cents)).toString().padStart(2, ' ')} cents ${isTooSharp ? '♯' : isTooFlat ? '♭' : ' '}` : 'Waiting for mic...'}
-        </div>
-      </div>
-
       <div className="relative w-full flex flex-col items-center justify-center gap-2 pt-2 pb-1">
-        
-        {/* Tuning Direction Arrows & Lights */}
-        <div className="flex items-center justify-between w-full px-6 text-xs">
-          {/* Flat indicator */}
-          <div className={`text-xl -mt-1 transition-colors ${currentPitch?.frequency && isTooFlat ? 'text-amber-500 drop-shadow-[0_0_5px_rgba(245,158,11,0.8)]' : 'text-muted-foreground/20'}`}>
-            ◀
-          </div>
-          
-          {/* Tuned indicator */}
-          <div className={`w-3 h-3 rounded-full transition-colors ${currentPitch?.frequency && isTuned ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,1)]' : 'bg-muted-foreground/20'}`} />
-          
-          {/* Sharp indicator */}
-          <div className={`text-xl -mt-1 transition-colors ${currentPitch?.frequency && isTooSharp ? 'text-amber-500 drop-shadow-[0_0_5px_rgba(245,158,11,0.8)]' : 'text-muted-foreground/20'}`}>
-            ▶
-          </div>
-        </div>
+        {/* PolyTune-style LED Bars — hang from top, V-shape pointing down */}
+        <div className="flex items-start justify-center gap-[5px] h-50 w-full">
+           {Array.from({ length: 11 }).map((_, i) => {
+              const center = 5;
+              const distance = Math.abs(i - center);
+              const maxH = 160;
+              const minH = 28;
+              const h = maxH - (distance / center) * (maxH - minH);
 
-        {/* LED Bars */}
-        <div className="flex items-end justify-center gap-[3px] h-12 w-full mt-2">
-           {Array.from({ length: 21 }).map((_, i) => {
-              const distance = Math.abs(i - 10);
-              // Calculate height curve: center is tallest (36px), edges are shortest (8px)
-              const maxH = 36;
-              const minH = 8;
-              const h = maxH - (distance / 10) * (maxH - minH);
-              
-              let isLit = false;
-              let isBloom = false;
-              let color = 'bg-muted-foreground/10'; // completely unlit background
-              
+              let barStyle = '';
+              let style: React.CSSProperties = { height: `${h}px` };
+
               if (currentPitch?.frequency) {
-                 // Clamp cents between -50 and 50
-                 const clampedCents = Math.max(-50, Math.min(50, cents));
-                 // Center is 10. Map roughly 5 cents per LED.
-                 // -50 -> 0 ... 0 -> 10 ... +50 -> 20
-                 const activeIndex = Math.round(clampedCents / 5) + 10;
-                 
-                 if (i === activeIndex) {
-                   isLit = true;
-                 } else if (Math.abs(i - activeIndex) === 1) {
-                   isBloom = true;
-                 }
+                // Map cents to bar index: -50→0, 0→5, +50→10
+                const clampedCents = Math.max(-50, Math.min(50, cents));
+                const activeIndex = Math.round((clampedCents / 50) * center) + center;
+                const dist = Math.abs(i - activeIndex);
 
-                 if (isLit) {
-                    color = isTuned ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,1)]' : 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,1)]';
-                 } else if (isBloom) {
-                    color = isTuned ? 'bg-emerald-500/50' : 'bg-amber-500/50';
-                 }
-              }
-              
-              // Render the center dot slightly visible when idle, to give orientation
-              if (!isLit && !isBloom && i === 10) {
-                 color = 'bg-muted-foreground/30';
+                if (dist === 0) {
+                  if (isTuned) {
+                    barStyle = 'bg-emerald-400';
+                    style = {
+                      ...style,
+                      boxShadow: '0 0 8px 4px rgba(52,211,153,0.9), 0 0 22px 8px rgba(52,211,153,0.55), 0 0 40px 12px rgba(52,211,153,0.25)',
+                    };
+                  } else {
+                    barStyle = 'bg-amber-400';
+                    style = {
+                      ...style,
+                      boxShadow: '0 0 8px 4px rgba(251,191,36,0.9), 0 0 22px 8px rgba(251,191,36,0.55), 0 0 40px 12px rgba(251,191,36,0.25)',
+                    };
+                  }
+                } else if (dist === 1) {
+                  barStyle = isTuned ? 'bg-emerald-500/60' : 'bg-amber-500/60';
+                  style = {
+                    ...style,
+                    boxShadow: isTuned
+                      ? '0 0 5px 3px rgba(52,211,153,0.35), 0 0 12px 5px rgba(52,211,153,0.15)'
+                      : '0 0 5px 3px rgba(251,191,36,0.35), 0 0 12px 5px rgba(251,191,36,0.15)',
+                  };
+                } else {
+                  barStyle = 'bg-muted-foreground/10';
+                }
+              } else {
+                barStyle = i === center ? 'bg-muted-foreground/25' : 'bg-muted-foreground/10';
               }
 
               return (
-                 <div 
-                   key={i} 
-                   className={`w-1.5 rounded-sm transition-all duration-75 ${color}`} 
-                   style={{ height: `${h}px` }} 
-                 />
+                <div
+                  key={i}
+                  className={`w-6 rounded-sm transition-all duration-75 ${barStyle}`}
+                  style={style}
+                />
               );
            })}
         </div>
-        
-        {/* Tick labels */}
-        <div className="w-full flex justify-between px-1 mt-1 text-[9px] text-muted-foreground/50 font-mono">
-          <span>-50</span>
-          <span>0</span>
-          <span>+50</span>
-        </div>
-
-      </div>
+        {/* Note label — below bars */}
+        <div className="flex flex-col items-center justify-center h-24 mb-4">
+           <div 
+             className="text-[100px] text-[#6b6354]"
+             style={{ 
+               fontFamily: "'DSEG14-Classic', monospace",
+               fontStyle: "italic",
+               textShadow: "0 0 12px rgba(107, 99, 84, 0.8), 0 0 24px rgba(107, 99, 84, 0.4)"
+             }}
+           >
+             {currentPitch?.frequency ? targetName.replace(/\d+$/, '') : '-'}
+           </div>
+        </div>      </div>
     </div>
   );
 }
