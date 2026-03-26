@@ -1,73 +1,41 @@
-# React + TypeScript + Vite
+# Bass Groove Trainer
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**[Live demo](https://orthagh.github.io/basstrainer/)**
 
-Currently, two official plugins are available:
+An interactive browser-based practice tool for bass players. Pick an exercise, plug in your mic, and play along — the app listens to you in real time and tells you how tight your groove is.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## What it does
 
-## React Compiler
+- **Listens to you play** via microphone, detecting pitch and timing as you go
+- **Scores your performance** after each exercise: note accuracy, timing consistency, and a *Groove Lock* score that shows whether you rush or drag
+- **Renders interactive tablature** so you can loop sections, adjust the tempo, and use a built-in metronome to work on tough passages
+- **Tracks your progress** across sessions, saving your best scores per exercise
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Exercises
 
-## Expanding the ESLint configuration
+Exercises range from beginner to advanced and cover groove patterns, melodic movement, string crossing, sixteenth-note foundations, and speed builders. Each one has a default tempo you can freely adjust.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Getting started
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open the app in your browser, select an exercise from the sidebar, enable your microphone, and hit play. A count-in bar gives you time to settle before evaluation begins.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Keyboard shortcuts
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+| Key | Action |
+|-----|--------|
+| `Space` | Play / Pause |
+| `Esc` | Stop |
+| `L` | Toggle loop |
+| `M` | Toggle metronome |
+| `F` | Fullscreen |
+| `← / →` | Tempo ±5 BPM |
+| `↑ / ↓` | Tempo ±1 BPM |
+
+## Stack
+
+React · TypeScript · Vite · AlphaTab (sheet music rendering) · Web Audio API
