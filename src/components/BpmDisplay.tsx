@@ -65,7 +65,7 @@ export default function BpmDisplay({
   );
 
   return (
-    <div className="relative flex items-center gap-1.5 select-none bg-muted rounded-lg px-2 py-1.5" role="group" aria-label="Tempo setting">
+    <div className="relative flex items-center gap-1.5 select-none px-1" role="group" aria-label="Tempo setting">
       {showPulse && (
         <div
           className={`absolute top-1 right-3 w-1.5 h-1.5 rounded-full transition-all duration-100 ease-out ${
@@ -107,14 +107,14 @@ export default function BpmDisplay({
               }
             }}
             aria-label="Enter tempo BPM"
-            className="w-[4.5ch] text-center text-3xl font-extrabold tabular-nums tracking-tighter bg-transparent text-foreground outline-none border-b-2 border-primary caret-primary"
+            className="w-[4.5ch] text-center text-xl font-extrabold tabular-nums tracking-tighter bg-transparent text-foreground outline-none border-b-2 border-primary caret-primary"
             maxLength={3}
           />
         ) : (
           <button
             onClick={() => !disabled && setEditing(true)}
             disabled={disabled}
-            className="text-3xl font-extrabold tabular-nums tracking-tighter text-foreground hover:text-primary disabled:opacity-40 transition-colors leading-none"
+            className="text-xl font-extrabold tabular-nums tracking-tighter text-foreground hover:text-primary disabled:opacity-40 transition-colors leading-none"
             aria-label={`Current tempo ${value} BPM. Click to edit.`}
           >
             {displayValue}

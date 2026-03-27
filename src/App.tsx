@@ -225,7 +225,7 @@ function App() {
     <TooltipProvider>
       <div ref={mainRef} className="h-screen bg-background flex flex-col overflow-hidden">
         {/* Header with Navigation */}
-        <header className="bg-card border-b border-border py-4 px-6 flex items-center justify-between shadow-sm">
+        <header className="bg-card border-b border-border py-4 px-6 flex items-center justify-between relative z-10">
           <div className="flex items-center gap-3 flex-1">
             <div className="bg-primary text-primary-foreground p-2 rounded-lg">
               <Activity size={24} />
@@ -337,7 +337,7 @@ function App() {
         </header>
 
         {/* Main Content Layout */}
-        <div className="flex-1 flex min-h-0 overflow-hidden relative">
+        <div className="flex-1 flex min-h-0 relative z-10">
           {/* Directory View */}
           {currentView === 'directory' && (
             <>
@@ -380,7 +380,7 @@ function App() {
                 </button>
               )}
 
-              <section className="flex-1 flex flex-col bg-card overflow-hidden min-h-0 min-w-0">
+              <section className="flex-1 flex flex-col bg-card min-h-0 min-w-0">
                 {directoryExercise ? (
                   <AlphaTabView
                     ref={alphaTabRef}
@@ -472,7 +472,7 @@ function App() {
               )}
 
               {/* Center: Practice Area */}
-              <section className="flex-1 flex flex-col bg-card overflow-hidden min-h-0 min-w-0">
+              <section className="flex-1 flex flex-col bg-card min-h-0 min-w-0">
                 {currentExercise ? (
                   <AlphaTabView
                     ref={alphaTabRef}

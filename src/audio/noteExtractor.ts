@@ -59,7 +59,7 @@ export function extractTimedNotes(api: AlphaTabApi): TimedNote[] {
 }
 
 /** A segment in the tempo map: from `startTick` the tempo is `bpm`. */
-interface TempoSegment {
+export interface TempoSegment {
   startTick: number;
   startMs: number;
   bpm: number;
@@ -72,7 +72,7 @@ const PPQN = 960; // AlphaTab uses 960 pulses per quarter note
  * Build a tempo map from AlphaTab's tick cache so we can convert
  * any tick to milliseconds accounting for tempo changes.
  */
-function buildTempoMap(api: AlphaTabApi): TempoSegment[] {
+export function buildTempoMap(api: AlphaTabApi): TempoSegment[] {
   const segments: TempoSegment[] = [];
   const tickCache = api.tickCache;
   const baseTempo = api.score?.tempo ?? 120;
@@ -119,7 +119,7 @@ function buildTempoMap(api: AlphaTabApi): TempoSegment[] {
 /**
  * Convert a MIDI tick to milliseconds using the pre-built tempo map.
  */
-function tickToMs(tempoMap: TempoSegment[], tick: number): number {
+export function tickToMs(tempoMap: TempoSegment[], tick: number): number {
   // Find the last segment that starts at or before `tick`
   let seg = tempoMap[0];
   for (let i = tempoMap.length - 1; i >= 0; i--) {

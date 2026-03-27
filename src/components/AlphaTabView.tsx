@@ -9,7 +9,7 @@ import {
   model,
 } from '@coderline/alphatab';
 import type { Exercise } from '../data/exercises';
-import { extractTimedNotes, type TimedNote } from '../audio/noteExtractor';
+import { extractTimedNotes, buildTempoMap, tickToMs, type TimedNote } from '../audio/noteExtractor';
 import { playClick as synthClick } from '../audio/clickSynth';
 import MetronomeSettings, { type MetronomeConfig } from './MetronomeSettings';
 import DisplaySettings from './DisplaySettings';
@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/popover';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { FaMicrophone, FaDrum, FaMusic } from 'react-icons/fa6';
 import { GiGuitar } from 'react-icons/gi';
 import { MdAudiotrack } from 'react-icons/md';
@@ -38,6 +38,12 @@ const EVAL_ON_TIME_MS = 20;
 const EVAL_COLOR_HIT    = new model.Color(34, 197, 94);    // emerald-500
 const EVAL_COLOR_TIMING = new model.Color(245, 158, 11);   // amber-500
 const EVAL_COLOR_MISS   = new model.Color(239, 68, 68);    // red-500
+
+interface SectionMarker {
+  text: string;
+  startMs: number;
+  startTick: number;
+}
 
 interface LoopHighlightRect {
   barIndex: number;
@@ -243,9 +249,11 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
   const baseTempo = useRef(exercise.defaultTempo);
   const [currentTime, setCurrentTime] = useState(0);
   const [endTime, setEndTime] = useState(0);
+  const [scoreDurationMs, setScoreDurationMs] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [staveProfile, setStaveProfile] = useState<StaveProfile>(() => loadStaveProfile());
   const [beatBoundsMap, setBeatBoundsMap] = useState<Map<number, BeatRect>>(new Map());
+  const [sections, setSections] = useState<SectionMarker[]>([]);
   const [beatPulse, setBeatPulse] = useState(false);
   const [loopSelectableBeats, setLoopSelectableBeats] = useState<LoopBeatRange[]>([]);
   const [isLooping, setIsLooping] = useState(false);
@@ -261,6 +269,8 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
   const [soloTrackIndexes, setSoloTrackIndexes] = useState<number[]>([]);
   const [trackVolumes, setTrackVolumes] = useState<Record<number, number>>({});
   const [activeVolumeTrackIndex, setActiveVolumeTrackIndex] = useState<number | null>(null);
+  const [isTracksPanelOpen, setIsTracksPanelOpen] = useState(false);
+  const [scoreInfo, setScoreInfo] = useState<{ title: string; artist: string; tunings: Map<number, string[]> } | null>(null);
   const beatPulseTimeoutRef = useRef<number | null>(null);
   const activeVolumeTimeoutRef = useRef<number | null>(null);
   const loopBeatIndexMapRef = useRef<Map<InstanceType<typeof model.Beat>, number>>(new Map());
@@ -278,12 +288,14 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     setPlayerReady(false);
     setCurrentTime(0);
     setEndTime(0);
+    setScoreDurationMs(0);
     setAvailableTracks([]);
     setSelectedTrackIndex(null);
     setMutedTrackIndexes([]);
     setSoloTrackIndexes([]);
     setTrackVolumes({});
     setLoopSelectableBeats([]);
+    setSections([]);
     setHasLoopSelection(false);
     setIsLoopDragging(false);
     setLoopDragStartBeatIndex(null);
@@ -300,6 +312,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
         staveProfile: 'Default',  // Standard notation + tab
         layoutMode: 0, // Page — wraps score onto multiple lines
         scale: 1.0,
+        firstSystemPaddingTop: 8,
         systemPaddingTop: 20,
         systemPaddingBottom: 20,
       },
@@ -317,22 +330,36 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     } as unknown as Settings);
 
     apiRef.current = api;
-    // Hide score header & tempo from rendered notation (shown in our toolbar)
+    // Score header rendered as custom React elements; hide AlphaTab's native rendering
     const els = api.settings.notation.elements;
     els.set(NotationElement.ScoreTitle, false);
     els.set(NotationElement.ScoreSubTitle, false);
     els.set(NotationElement.ScoreArtist, false);
+    els.set(NotationElement.GuitarTuning, false);
     els.set(NotationElement.ScoreAlbum, false);
     els.set(NotationElement.ScoreWords, false);
     els.set(NotationElement.ScoreMusic, false);
     els.set(NotationElement.ScoreWordsAndMusic, false);
     els.set(NotationElement.ScoreCopyright, false);
-    els.set(NotationElement.GuitarTuning, false);
     els.set(NotationElement.EffectTempo, false);
     // ── Events ────────────────────────────────────
     api.scoreLoaded.on((score) => {
       const nextTracks = score.tracks as AlphaTabTrack[];
       const validIndexes = new Set(nextTracks.map((track) => track.index));
+
+      // Extract title, artist, and per-track tuning for custom header
+      const tunings = new Map<number, string[]>();
+      for (const track of nextTracks) {
+        const raw: number[] = track.staves?.[0]?.tuning ?? [];
+        if (raw.length > 0) {
+          tunings.set(track.index, raw.map((midi) => model.Tuning.getTextForTuning(midi, false)));
+        }
+      }
+      setScoreInfo({
+        title: (score as unknown as { title: string }).title ?? '',
+        artist: (score as unknown as { artist: string }).artist ?? '',
+        tunings,
+      });
 
       setAvailableTracks(nextTracks);
       setSelectedTrackIndex((previous) => {
@@ -359,6 +386,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     api.renderStarted.on(() => setIsLoading(true));
     api.renderFinished.on(() => {
       setIsLoading(false);
+      viewportRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' });
       // Build beat bounds map for note evaluation overlay
       const lookup = api.renderer.boundsLookup;
       const score = api.score;
@@ -403,6 +431,29 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
       if (onNoteDataExtracted) {
         const timedNotes = extractTimedNotes(api);
         onNoteDataExtracted(timedNotes);
+      }
+
+      // Extract section markers for the progress bar
+      if (api.score && api.tickCache) {
+        const tempoMap = buildTempoMap(api);
+        const mbs = api.tickCache.masterBars;
+        if (mbs.length > 0) {
+          const lastMb = mbs[mbs.length - 1];
+          setScoreDurationMs(tickToMs(tempoMap, lastMb.end));
+        }
+        const extracted: SectionMarker[] = [];
+        for (const mb of api.tickCache.masterBars) {
+          const sec = mb.masterBar.section;
+          if (sec) {
+            const label = sec.text?.trim() || sec.marker?.trim() || '';
+            extracted.push({ text: label, startMs: tickToMs(tempoMap, mb.start), startTick: mb.start });
+          }
+        }
+        // If the score starts before the first section marker, prepend an unnamed section at tick 0
+        if (extracted.length > 0 && extracted[0].startTick > 0) {
+          extracted.unshift({ text: '', startMs: 0, startTick: 0 });
+        }
+        setSections(extracted);
       }
     });
 
@@ -1029,191 +1080,87 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
   };
 
   return (
-    <div className="flex flex-col h-full bg-card overflow-hidden">
+    <div className="flex flex-col h-full bg-card min-h-0">
       {/* Top bar */}
-      <div className="px-3 py-2 border-b border-border flex items-center gap-3" role="toolbar" aria-label="Playback Controls">
+      <div className="border-b border-border grid grid-cols-[1fr_auto_1fr] h-14 overflow-visible relative z-20" role="toolbar" aria-label="Playback Controls">
 
-        {/* ── Left group: Play · Time · Title ── */}
-        <div className="flex items-center gap-3 min-w-0">
-          {/* Play / Pause */}
-          <button
-            onClick={playPause}
-            disabled={!playerReady}
-            className="bg-primary hover:bg-primary/80 disabled:bg-muted text-primary-foreground rounded-lg p-2.5 shadow-sm transition-all shrink-0"
-            title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
-            aria-label={isPlaying ? 'Pause' : 'Play'}
-            aria-pressed={isPlaying}
-          >
-            {isPlaying ? (
-              <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
-                <rect x="4" y="3" width="4" height="14" rx="1" />
-                <rect x="12" y="3" width="4" height="14" rx="1" />
-              </svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M5 3.5L16 10L5 16.5V3.5Z" />
-              </svg>
-            )}
-          </button>
+        {/* ── Far left: Tracks / Mixer toggle ── */}
+        <div className="flex items-stretch">
+          {availableTracks.length > 1 && (
+            <button
+              onClick={() => setIsTracksPanelOpen((v) => !v)}
+              disabled={!playerReady}
+              className="h-full px-4 bg-secondary hover:bg-secondary/80 text-secondary-foreground border-r border-border disabled:opacity-40 inline-flex items-center gap-2 shrink-0 transition-colors"
+              title="Track selection and mixer"
+              aria-label="Track selection and mixer"
+              aria-expanded={isTracksPanelOpen}
+            >
+              <span className="h-5 w-5 inline-flex items-center justify-center shrink-0 opacity-80">
+                {getInstrumentIcon(availableTracks.find((t) => t.index === selectedTrackIndex) ?? availableTracks[0])}
+              </span>
+              <span className="text-sm font-medium truncate max-w-32">
+                {selectedTrackIndex === null
+                  ? `${availableTracks.length} Tracks`
+                  : getTrackLabel(availableTracks.find((track) => track.index === selectedTrackIndex) ?? availableTracks[0])}
+              </span>
+              <ChevronRight
+                size={14}
+                className={`opacity-60 shrink-0 transition-transform duration-200 ${isTracksPanelOpen ? 'rotate-180' : ''}`}
+                aria-hidden="true"
+              />
+            </button>
+          )}
+        </div>
 
-          {/* Return to start */}
+
+        {/* ── Center: Return to start + Play/Pause ── */}
+        <div className="flex items-center justify-center">
+          {/* Return to start — outlined, left-rounded, right edge hidden behind play button */}
           <button
             onClick={stop}
             disabled={!playerReady}
-            className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary disabled:opacity-40 transition-colors shrink-0"
+            className="h-9 px-3 rounded-l-lg border border-r-0 border-border bg-secondary text-secondary-foreground hover:bg-secondary/70 disabled:opacity-40 transition-colors shrink-0 translate-x-1"
             title="Return to start (Escape)"
             aria-label="Return to start"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="5" width="3" height="14" rx="0.5" fill="currentColor" stroke="none" />
               <path d="M20 5L10 12l10 7V5z" fill="currentColor" stroke="none" />
             </svg>
           </button>
 
-          {/* Time */}
-          <span className="text-xs text-muted-foreground font-mono tabular-nums shrink-0" aria-live="off">
-            {fmt(currentTime)} / {fmt(endTime)}
-          </span>
-
-          {/* Separator */}
-          <div className="w-px h-6 bg-border shrink-0" role="presentation" />
-
-          {/* Title + subtitle */}
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-foreground truncate leading-tight">
-              {exercise.title}
-            </h2>
-            <p className="text-muted-foreground text-[11px] truncate leading-tight">{exercise.subtitle}</p>
+          {/* Play / Pause — overflows toolbar via absolute positioning */}
+          <div className="relative w-[4.5rem] flex items-center justify-center shrink-0">
+            <button
+              onClick={playPause}
+              disabled={!playerReady}
+              className="absolute top-1/2 -translate-y-1/2 bg-primary hover:bg-primary/80 disabled:bg-muted text-primary-foreground w-[4.5rem] h-[4.5rem] rounded-full transition-all flex items-center justify-center z-20 shadow-md"
+              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+              aria-label={isPlaying ? 'Pause' : 'Play'}
+              aria-pressed={isPlaying}
+            >
+              {isPlaying ? (
+                <svg width="32" height="32" viewBox="0 0 20 20" fill="currentColor">
+                  <rect x="4" y="3" width="4" height="14" rx="1" />
+                  <rect x="12" y="3" width="4" height="14" rx="1" />
+                </svg>
+              ) : (
+                <svg width="32" height="32" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M5 3.5L16 10L5 16.5V3.5Z" />
+                </svg>
+              )}
+            </button>
           </div>
+
+          {/* Spacer matching return-to-start width for centering */}
+          <div className="h-9 px-3 shrink-0 invisible" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" />
+          </div>
+
         </div>
 
-        {/* ── Spacer ── */}
-        <div className="flex-1" />
-
         {/* ── Right group: controls ── */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {availableTracks.length > 1 && (
-            <>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button
-                    disabled={!playerReady}
-                    className="h-8 px-2 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-40 inline-flex items-center gap-1.5"
-                    title="Track selection and mixer"
-                    aria-label="Track selection and mixer"
-                  >
-                    <span className="max-w-40 truncate">
-                      {selectedTrackIndex === null
-                        ? `Tracks ${availableTracks.length}`
-                        : getTrackLabel(availableTracks.find((track) => track.index === selectedTrackIndex) ?? availableTracks[0])}
-                    </span>
-                    <ChevronDown size={12} className="opacity-70" aria-hidden="true" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[26rem] p-4 max-h-[75vh]" align="end" sideOffset={8}>
-                  <div className="space-y-3">
-                    <div>
-                      <h4 className="text-sm font-semibold text-foreground">Tracks</h4>
-                      <p className="text-[11px] text-muted-foreground">Choose the single notation track and control playback mute or solo.</p>
-                    </div>
-                    <div className="space-y-2 overflow-y-auto pr-1 max-h-[calc(75vh-6.5rem)]">
-                      {availableTracks.map((track) => {
-                        const isSelected = selectedTrackIndex === track.index;
-                        const isMutedTrack = mutedTrackIndexes.includes(track.index);
-                        const isSoloTrack = soloTrackIndexes.includes(track.index);
-                        const volumePercent = Math.round((trackVolumes[track.index] ?? 1) * 100);
-
-                        return (
-                          <div
-                            key={`track-${track.index}`}
-                            className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border px-2 py-1.5 transition-colors ${
-                              isSelected
-                                ? 'border-primary/30 bg-primary/5'
-                                : 'border-border/70 bg-background/60'
-                            }`}
-                          >
-                            <div
-                              className={`min-w-0 space-y-1 rounded-md px-1.5 py-1 transition-colors ${
-                                isSelected
-                                  ? 'text-primary'
-                                  : 'text-foreground hover:bg-secondary/80'
-                              }`}
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => setSelectedTrackIndex(track.index)}
-                              onKeyDown={(event) => {
-                                if (event.key === 'Enter' || event.key === ' ') {
-                                  event.preventDefault();
-                                  setSelectedTrackIndex(track.index);
-                                }
-                              }}
-                              aria-label={isSelected ? `${getTrackLabel(track)} is active for notation` : `Set ${getTrackLabel(track)} as the active notation track`}
-                              aria-pressed={isSelected}
-                            >
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <span className={`h-1 w-1 rounded-full shrink-0 transition-opacity ${isSelected ? 'bg-primary opacity-100' : 'bg-primary opacity-0'}`} aria-hidden="true" />
-                                <span className={`h-8 w-8 inline-flex items-center justify-center shrink-0 rounded transition-colors ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
-                                  {getInstrumentIcon(track)}
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                  <p className={`truncate text-xs font-medium ${isSelected ? 'text-primary' : 'text-foreground'}`}>{getTrackLabel(track)}</p>
-                                </div>
-                              </div>
-                              <div
-                                className="space-y-1 pl-[3.75rem] pr-1 group"
-                                onClick={(event) => event.stopPropagation()}
-                                onPointerDown={(event) => event.stopPropagation()}
-                              >
-                                <Slider
-                                  min={0}
-                                  max={150}
-                                  step={5}
-                                  value={[volumePercent]}
-                                  onValueChange={([value]) => setTrackVolume(track.index, value)}
-                                  aria-label={`Volume for ${getTrackLabel(track)}`}
-                                  className={`[&_[role=slider]]:h-3 [&_[role=slider]]:w-3 hover:[&_[role=slider]]:h-4 hover:[&_[role=slider]]:w-4 [&_[data-slot=slider-range]]:bg-muted-foreground/40 [&_[data-slot=slider-thumb]]:border-muted-foreground/40 [&_[data-slot=slider-thumb]]:bg-background group-hover:[&_[data-slot=slider-range]]:bg-primary group-hover:[&_[data-slot=slider-thumb]]:border-primary ${activeVolumeTrackIndex === track.index ? '[&_[data-slot=slider-range]]:bg-primary [&_[data-slot=slider-thumb]]:border-primary' : ''}`}
-                                />
-                                <div className={`text-[10px] text-muted-foreground text-right tabular-nums h-3 transition-opacity ${activeVolumeTrackIndex === track.index ? 'opacity-100' : 'opacity-0'}`}>{volumePercent}%</div>
-                              </div>
-                            </div>
-                            <div className="flex gap-0.5 shrink-0">
-                              <button
-                                onClick={() => toggleTrackMute(track.index)}
-                                className={`h-7 w-7 rounded-l-md inline-flex items-center justify-center text-xs font-semibold transition-colors ${
-                                  isMutedTrack
-                                    ? 'bg-destructive/10 text-destructive'
-                                    : 'bg-secondary text-muted-foreground hover:text-foreground'
-                                }`}
-                                aria-label={isMutedTrack ? `Unmute ${getTrackLabel(track)}` : `Mute ${getTrackLabel(track)}`}
-                                aria-pressed={isMutedTrack}
-                                title={isMutedTrack ? 'Unmute' : 'Mute'}
-                              >
-                                M
-                              </button>
-                              <button
-                                onClick={() => toggleTrackSolo(track.index)}
-                                className={`h-7 w-7 rounded-r-md inline-flex items-center justify-center text-xs font-semibold transition-colors ${
-                                  isSoloTrack
-                                    ? 'bg-amber-500/15 text-amber-600'
-                                    : 'bg-secondary text-muted-foreground hover:text-foreground'
-                                }`}
-                                aria-label={isSoloTrack ? `Disable solo for ${getTrackLabel(track)}` : `Solo ${getTrackLabel(track)}`}
-                                aria-pressed={isSoloTrack}
-                                title={isSoloTrack ? 'Disable solo' : 'Solo'}
-                              >
-                                S
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </>
-          )}
-
+        <div className="flex items-center justify-end gap-1.5 px-3">
           {/* Tempo */}
           <BpmDisplay
             value={tempo}
@@ -1367,7 +1314,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
           <button
             onClick={toggleLoop}
             disabled={!playerReady}
-            className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 ${
+            className={`h-8 w-8 flex items-center justify-center rounded-lg transition-colors disabled:opacity-40 ${
               isLooping
                 ? 'bg-primary/10 text-primary'
                 : 'text-muted-foreground hover:bg-secondary'
@@ -1400,26 +1347,103 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
         </div>
       </div>
 
-      {/* Progress bar (under toolbar) */}
-      <div 
-        className="h-0.5 bg-muted shrink-0"
-        role="progressbar"
-        aria-label="Playback progress"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={endTime > 0 ? Math.round((currentTime / endTime) * 100) : 0}
-      >
-        <div
-          className="h-full bg-primary transition-all duration-200"
-          style={{ width: endTime > 0 ? `${(currentTime / endTime) * 100}%` : '0%' }}
-        />
-      </div>
+      {/* Content row: sliding tracks panel + viewport */}
+      <div className="flex flex-1 min-h-0">
 
-      {/* AlphaTab rendering viewport */}
-      <div
-        ref={viewportRef}
-        className="flex-1 overflow-y-auto relative isolate scrollbar-autohide"
-      >
+        {/* Sliding tracks panel */}
+        {availableTracks.length > 1 && (
+          <div
+            className={`shrink-0 overflow-hidden border-r border-border bg-card transition-[width] duration-200 ease-in-out relative z-10 ${isTracksPanelOpen ? 'w-72' : 'w-0'}`}
+          >
+            <div className="w-72 h-full overflow-y-auto">
+              <div className="divide-y divide-border">
+                {availableTracks.map((track) => {
+                  const isSelected = selectedTrackIndex === track.index;
+                  const isMutedTrack = mutedTrackIndexes.includes(track.index);
+                  const isSoloTrack = soloTrackIndexes.includes(track.index);
+                  const volumePercent = Math.round((trackVolumes[track.index] ?? 1) * 100);
+                  return (
+                    <div
+                      key={`track-${track.index}`}
+                      className={`flex items-center gap-1.5 px-2 py-3.5 cursor-pointer select-none transition-colors ${
+                        isSelected ? 'bg-primary/10' : 'hover:bg-secondary/50'
+                      }`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedTrackIndex(track.index)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedTrackIndex(track.index);
+                        }
+                      }}
+                      aria-label={isSelected ? `${getTrackLabel(track)} is active for notation` : `Set ${getTrackLabel(track)} as the active notation track`}
+                      aria-pressed={isSelected}
+                    >
+                      {/* Icon */}
+                      <span className={`h-5 w-5 shrink-0 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
+                        {getInstrumentIcon(track)}
+                      </span>
+
+                      {/* Name */}
+                      <span className={`flex-1 text-xs font-medium truncate ${isSelected ? 'text-primary' : 'text-foreground'}`}>
+                        {getTrackLabel(track)}
+                      </span>
+
+                      {/* Volume slider */}
+                      <div
+                        className="w-16 shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        <Slider
+                          min={0}
+                          max={150}
+                          step={5}
+                          value={[volumePercent]}
+                          onValueChange={([value]) => setTrackVolume(track.index, value)}
+                          aria-label={`Volume for ${getTrackLabel(track)}`}
+                          className={`[&_[role=slider]]:h-2.5 [&_[role=slider]]:w-2.5 [&_[data-slot=slider-range]]:bg-muted-foreground/40 [&_[data-slot=slider-thumb]]:border-muted-foreground/40 [&_[data-slot=slider-thumb]]:bg-background hover:[&_[data-slot=slider-range]]:bg-primary hover:[&_[data-slot=slider-thumb]]:border-primary ${activeVolumeTrackIndex === track.index ? '[&_[data-slot=slider-range]]:bg-primary [&_[data-slot=slider-thumb]]:border-primary' : ''}`}
+                        />
+                      </div>
+
+                      {/* M/S buttons — clicking selects track (via row), buttons act on their own */}
+                      <div className="flex gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => toggleTrackMute(track.index)}
+                          className={`h-5 w-5 rounded text-[10px] font-semibold inline-flex items-center justify-center transition-colors ${
+                            isMutedTrack ? 'bg-destructive/10 text-destructive' : 'bg-secondary text-muted-foreground hover:text-foreground'
+                          }`}
+                          aria-label={isMutedTrack ? `Unmute ${getTrackLabel(track)}` : `Mute ${getTrackLabel(track)}`}
+                          aria-pressed={isMutedTrack}
+                          title={isMutedTrack ? 'Unmute' : 'Mute'}
+                        >M</button>
+                        <button
+                          onClick={() => toggleTrackSolo(track.index)}
+                          className={`h-5 w-5 rounded text-[10px] font-semibold inline-flex items-center justify-center transition-colors ${
+                            isSoloTrack ? 'bg-amber-500/15 text-amber-600' : 'bg-secondary text-muted-foreground hover:text-foreground'
+                          }`}
+                          aria-label={isSoloTrack ? `Disable solo for ${getTrackLabel(track)}` : `Solo ${getTrackLabel(track)}`}
+                          aria-pressed={isSoloTrack}
+                          title={isSoloTrack ? 'Disable solo' : 'Solo'}
+                        >S</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Right side: viewport + progress bar */}
+        <div className="flex-1 flex flex-col min-h-0">
+
+        {/* AlphaTab rendering viewport */}
+        <div
+          ref={viewportRef}
+          className="flex-1 overflow-y-auto relative isolate scrollbar-autohide"
+        >
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-card/80 z-10">
             <div className="flex flex-col items-center gap-2">
@@ -1428,6 +1452,37 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
             </div>
           </div>
         )}
+
+        {/* Custom score header: tuning left, title+artist centered */}
+        {scoreInfo && (scoreInfo.title || scoreInfo.artist) && (() => {
+          const tuningNotes = selectedTrackIndex !== null
+            ? (scoreInfo.tunings.get(selectedTrackIndex) ?? null)
+            : null;
+          return (
+            <div className="flex flex-col items-center px-6 pt-6 pb-4 gap-1">
+              {/* Title + artist */}
+              <div className="text-center">
+                {scoreInfo.title && (
+                  <h2 className="text-lg font-bold text-foreground leading-tight">{scoreInfo.title}</h2>
+                )}
+                {scoreInfo.artist && (
+                  <p className="text-sm text-muted-foreground mt-0.5">{scoreInfo.artist}</p>
+                )}
+              </div>
+              {/* Tuning row — strings left (high) to right (low) */}
+              {tuningNotes && (
+                <div className="flex items-center gap-1.5">
+                  {[...tuningNotes].reverse().map((note, i) => (
+                    <span key={i} className="text-[10px] font-mono text-muted-foreground/40 leading-none">
+                      {note}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         <div
           className={`relative ${isLooping ? 'cursor-ew-resize' : ''}`}
           onPointerDown={handleLoopSelectionPointerDown}
@@ -1455,6 +1510,70 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
           )}
         </div>
       </div>
+
+        {/* Progress bar — pinned at bottom */}
+        <div
+          className="shrink-0 flex items-stretch border-t border-border"
+          style={{ height: sections.length > 0 ? '2.5rem' : '1.25rem' }}
+          role="progressbar"
+          aria-label="Playback progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={endTime > 0 ? Math.round((currentTime / endTime) * 100) : 0}
+        >
+          {/* Timeline area */}
+          <div className="flex-1 relative overflow-hidden bg-muted/60">
+            {/* Section bands */}
+            {sections.length > 0 && sections.map((section, i) => {
+              const duration = Math.max(endTime, scoreDurationMs);
+              const startPct = duration > 0 ? (section.startMs / duration) * 100 : 0;
+              const nextStartMs = sections[i + 1]?.startMs ?? duration;
+              const widthPct = duration > 0 ? ((nextStartMs - section.startMs) / duration) * 100 : 0;
+              return (
+                <button
+                  key={i}
+                  className="absolute inset-y-0 flex items-center px-2 overflow-hidden border-r border-border/60 hover:brightness-110 transition-[filter] cursor-pointer"
+                  style={{
+                    left: `${startPct}%`,
+                    width: `${widthPct}%`,
+                    backgroundColor: i % 2 === 0 ? 'hsl(var(--muted) / 0.9)' : 'transparent',
+                  }}
+                  title={`Go to: ${section.text}`}
+                  onClick={() => {
+                    const api = apiRef.current;
+                    if (!api) return;
+                    api.tickPosition = section.startTick;
+                    api.scrollToCursor();
+                  }}
+                >
+                  <span className="text-[9px] font-medium text-muted-foreground truncate leading-none select-none pointer-events-none">
+                    {section.text}
+                  </span>
+                </button>
+              );
+            })}
+            {/* Playback fill */}
+            <div
+              className="absolute inset-y-0 left-0 bg-primary/20 pointer-events-none transition-[width] duration-200"
+              style={{ width: endTime > 0 ? `${(currentTime / endTime) * 100}%` : '0%' }}
+            />
+            {/* Playback cursor */}
+            <div
+              className="absolute inset-y-0 w-px bg-primary pointer-events-none transition-[left] duration-200"
+              style={{ left: endTime > 0 ? `${(currentTime / endTime) * 100}%` : '0%' }}
+            />
+          </div>
+          {/* Timers — reserved right slot */}
+          <div className="shrink-0 w-28 flex items-center justify-end px-3 gap-0.5 border-l border-border/40">
+            <span className="text-[10px] font-mono tabular-nums text-foreground" aria-live="off">{fmt(currentTime)}</span>
+            <span className="text-[10px] text-muted-foreground/50 mx-0.5">/</span>
+            <span className="text-[10px] font-mono tabular-nums text-muted-foreground">{fmt(endTime)}</span>
+          </div>
+        </div>
+
+        </div>{/* end right side */}
+
+      </div>{/* end content row */}
 
     </div>
   );

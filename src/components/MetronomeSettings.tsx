@@ -69,12 +69,12 @@ export default function MetronomeSettings({
 
   return (
     <Popover>
-      <div className={`flex items-center rounded-lg overflow-hidden transition-colors ${active ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`}>
+      <div className={`h-8 flex items-center rounded-lg overflow-hidden transition-colors ${active ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`}>
         {/* Toggle button — left part */}
         <button
           disabled={disabled}
           onClick={() => update({ enabled: !active })}
-          className="flex items-center p-2 transition-colors disabled:opacity-40 hover:bg-black/5 dark:hover:bg-white/10 rounded-l-lg"
+          className="h-full flex items-center px-2 transition-colors disabled:opacity-40 hover:bg-black/5 dark:hover:bg-white/10 rounded-l-lg"
           title={active ? 'Disable metronome' : 'Enable metronome'}
         >
           <MetronomeIcon size={18} />
@@ -87,7 +87,7 @@ export default function MetronomeSettings({
         <PopoverTrigger asChild>
           <button
             disabled={disabled}
-            className="flex items-center px-1.5 py-2 transition-colors disabled:opacity-40 hover:bg-black/5 dark:hover:bg-white/10 rounded-r-lg"
+            className="h-full flex items-center px-1.5 transition-colors disabled:opacity-40 hover:bg-black/5 dark:hover:bg-white/10 rounded-r-lg"
             title="Metronome settings"
           >
             <ChevronDown size={12} className="opacity-60" />

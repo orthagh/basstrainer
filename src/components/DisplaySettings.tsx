@@ -50,7 +50,7 @@ export default function DisplaySettings({
       <PopoverTrigger asChild>
         <button
           disabled={disabled}
-          className="flex items-center p-2 rounded-lg transition-colors disabled:opacity-40 text-muted-foreground hover:bg-muted"
+          className="h-8 w-8 flex items-center justify-center rounded-lg transition-colors disabled:opacity-40 text-muted-foreground hover:bg-muted"
           title="Display settings"
         >
           <SlidersHorizontal size={16} />
