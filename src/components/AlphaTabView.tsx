@@ -320,7 +320,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
         enablePlayer: true,
         enableCursor: true,
         enableUserInteraction: true,
-        soundFont: import.meta.env.BASE_URL + 'soundfont/sonivox.sf2',
+        soundFont: import.meta.env.BASE_URL + 'soundfont/musescore-general.sf3',
         outputMode: 1, // WebAudioScriptProcessor — bypass AudioWorklet (Vite 8 compat)
         scrollElement: viewportRef.current!,
         scrollOffsetX: -30,
@@ -455,6 +455,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
         }
         setSections(extracted);
       }
+
     });
 
     api.playerStateChanged.on((args) => {
