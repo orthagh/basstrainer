@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Keyboard, RotateCcw, Info, AudioLines } from 'lucide-react';
+import { Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Keyboard, RotateCcw, Info, AudioLines, FolderTree } from 'lucide-react';
 import MetronomeIcon from './components/MetronomeIcon';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
@@ -14,6 +14,7 @@ import PostExerciseSummary from './components/PostExerciseSummary';
 import WelcomeModal from './components/WelcomeModal';
 import TunerPage from './components/TunerPage';
 import MetronomePage, { type MetronomeHandle } from './components/MetronomePage';
+import ExerciseDirectoryTree from './components/ExerciseDirectoryTree';
 import { exercises, type Exercise } from './data/exercises';
 import { useAudioInput } from './hooks/useAudioInput';
 import { useDemoMode } from './hooks/useDemoMode';
@@ -22,15 +23,17 @@ import { useEvaluation } from './hooks/useEvaluation';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import type { TimedNote } from './audio/noteExtractor';
 import type { MetronomeConfig } from './components/MetronomeSettings';
+import { useExerciseDirectory } from './features/exerciseDirectory/useExerciseDirectory.ts';
 import './components/alphatab.css';
 
-type AppView = 'trainer' | 'tuner' | 'metronome';
+type AppView = 'directory' | 'trainer' | 'tuner' | 'metronome';
 
-const VIEWS: AppView[] = ['trainer', 'tuner', 'metronome'];
+const VIEWS: AppView[] = ['directory', 'trainer', 'tuner', 'metronome'];
+const LAST_TRAINER_EXERCISE_KEY = 'groovetrainer:lastOpenedTrainerExerciseId';
 
 function viewFromHash(): AppView {
   const hash = window.location.hash.replace(/^#\/?/, '');
-  return (VIEWS as string[]).includes(hash) ? (hash as AppView) : 'trainer';
+  return (VIEWS as string[]).includes(hash) ? (hash as AppView) : 'directory';
 }
 
 function App() {
@@ -46,11 +49,33 @@ function App() {
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
-  const [currentExercise, setCurrentExercise] = useState<Exercise | null>(null);
+  const [currentExercise, setCurrentExercise] = useState<Exercise | null>(() => {
+    const id = localStorage.getItem(LAST_TRAINER_EXERCISE_KEY);
+    return exercises.find((exercise) => exercise.id === id) ?? null;
+  });
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [noteData, setNoteData] = useState<TimedNote[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const scorePositionRef = useRef(0);
+  const directory = useExerciseDirectory();
+
+  const directoryExercise = directory.selectedFile
+    ? {
+        id: `directory:${directory.selectedFile.id}`,
+        title: directory.selectedFile.name,
+        subtitle: `GP (${directory.selectedFile.sourceFormat.toUpperCase()})`,
+        difficulty: 'intermediate' as const,
+        category: 'Directory',
+        defaultTempo: 120, // placeholder — overwritten from score.tempo on playerReady
+        filePath: directory.selectedFile.filePath,
+      }
+    : null;
+
+  useEffect(() => {
+    if (currentExercise) {
+      localStorage.setItem(LAST_TRAINER_EXERCISE_KEY, currentExercise.id);
+    }
+  }, [currentExercise]);
 
   // Metronome config — lifted here so evaluation can read count-in state
   const [metronomeConfig, setMetronomeConfig] = useState<MetronomeConfig>({
@@ -118,14 +143,14 @@ function App() {
     expectedNotes: noteData,
     isPlaying,
     isListening: effectiveListening,
-    evaluationEnabled: true,
+    evaluationEnabled: currentView === 'trainer',
     lastDetectedNote: effectiveLastNote,
     scorePositionRef,
   });
 
   // Save progress when an evaluation finishes
   useEffect(() => {
-    if (evaluation.summary && currentExercise) {
+    if (currentView === 'trainer' && evaluation.summary && currentExercise) {
       setPreviousBest(prev => {
         if (prev === null) {
           return progress.progressData[currentExercise.id]?.bestScore ?? null;
@@ -145,7 +170,7 @@ function App() {
     } else {
       setPreviousBest(null);
     }
-  }, [evaluation.summary, currentExercise?.id, progress.saveProgress, progress.progressData]);
+  }, [currentView, evaluation.summary, currentExercise?.id, progress.saveProgress, progress.progressData]);
 
   // ── Next exercise (if available) ───────────────────
   const currentIndex = currentExercise ? exercises.findIndex((e) => e.id === currentExercise.id) : -1;
@@ -212,6 +237,18 @@ function App() {
 
           {/* Center Navigation Menu */}
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigateTo('directory')}
+              className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors ${
+                currentView === 'directory'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+              title="Exercise Directory"
+            >
+              <FolderTree size={24} />
+              <span className="text-xs font-medium">Directory</span>
+            </button>
             <button
               onClick={() => navigateTo('trainer')}
               className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors ${
@@ -301,6 +338,83 @@ function App() {
 
         {/* Main Content Layout */}
         <div className="flex-1 flex min-h-0 overflow-hidden relative">
+          {/* Directory View */}
+          {currentView === 'directory' && (
+            <>
+              {sidebarOpen ? (
+                <>
+                  <div
+                    className="sm:hidden fixed inset-0 bg-black/50 z-30 animate-in fade-in"
+                    onClick={() => setSidebarOpen(false)}
+                    aria-hidden="true"
+                  />
+                  <aside className="w-full sm:w-72 shrink-0 bg-card border-r border-border flex flex-col overflow-hidden absolute inset-0 z-40 sm:relative sm:inset-auto shadow-2xl sm:shadow-none animate-in slide-in-from-left duration-200">
+                    <div className="flex items-center justify-between px-3 pt-3 pb-2 shrink-0 border-b border-border/50 sm:border-none">
+                      <h3 className="font-semibold text-foreground text-sm">Directory</h3>
+                      <button
+                        onClick={() => setSidebarOpen(false)}
+                        className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                        title="Collapse sidebar"
+                      >
+                        <PanelLeftClose size={16} />
+                      </button>
+                    </div>
+                    <div className="flex-1 min-h-0">
+                      <ExerciseDirectoryTree
+                        root={directory.root}
+                        selectedNodeId={directory.selectedNodeId}
+                        selectedFolderId={directory.selectedFolderId}
+                        onSelectNode={directory.selectNode}
+                        onToggleFolder={directory.toggleFolder}
+                      />
+                    </div>
+                  </aside>
+                </>
+              ) : (
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="shrink-0 self-start m-2 p-2 bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors rounded-lg"
+                  title="Show directory"
+                >
+                  <PanelLeftOpen size={20} />
+                </button>
+              )}
+
+              <section className="flex-1 flex flex-col bg-card overflow-hidden min-h-0 min-w-0">
+                {directoryExercise ? (
+                  <AlphaTabView
+                    ref={alphaTabRef}
+                    key={directoryExercise.id}
+                    exercise={directoryExercise}
+                    metronomeConfig={metronomeConfig}
+                    onMetronomeConfigChange={setMetronomeConfig}
+                    onNoteDataExtracted={(notes) => setNoteData(notes)}
+                    onPlayStateChange={handlePlayStateChange}
+                    onPositionChange={handlePositionChange}
+                  />
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground animate-in fade-in zoom-in-95 duration-300">
+                    <div className="bg-muted p-6 rounded-full mb-6">
+                      <FolderTree size={48} className="text-primary/50" />
+                    </div>
+                    <h2 className="text-2xl font-semibold text-foreground mb-3">Exercise Directory</h2>
+                    <p className="max-w-md text-sm leading-relaxed">
+                      Put your files in repository-exercises/, run npm run exercises:convert, then reload this page.
+                    </p>
+                    {!sidebarOpen && (
+                      <button
+                        onClick={() => setSidebarOpen(true)}
+                        className="mt-8 px-6 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors font-medium"
+                      >
+                        Open Directory
+                      </button>
+                    )}
+                  </div>
+                )}
+              </section>
+            </>
+          )}
+
           {/* Trainer View */}
           {currentView === 'trainer' && (
             <>
@@ -418,7 +532,7 @@ function App() {
         </div>
 
         {/* Post-exercise summary overlay */}
-        {evaluation.summary && currentExercise && (
+        {currentView === 'trainer' && evaluation.summary && currentExercise && (
           <PostExerciseSummary
             summary={evaluation.summary}
             exerciseTitle={currentExercise.title}

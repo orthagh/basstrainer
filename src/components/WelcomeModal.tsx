@@ -1,4 +1,4 @@
-import { Activity, Crosshair, Mic, Play } from 'lucide-react';
+import { Activity, Crosshair, FolderOpen, Mic, Music, Play } from 'lucide-react';
 
 interface WelcomeModalProps {
   isOpen: boolean;
@@ -17,36 +17,52 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
               <Activity size={40} />
             </div>
           </div>
-          
+
           <h2 className="text-2xl font-bold text-center text-foreground mb-3">
-            Welcome to Bass Groove Trainer
+            Bass Groove Trainer
           </h2>
           <p className="text-center text-muted-foreground mb-8 text-sm">
-            An interactive practice tool designed to help you lock in your rhythm and improve your timing on the bass.
+            A personal practice tool for bass — play along with tablature, get timing feedback, and track your progress.
           </p>
 
-          <div className="space-y-5 mb-8">
+          <div className="space-y-4 mb-8">
             <div className="flex gap-4 items-start">
-              <div className="bg-muted p-2 rounded-lg text-foreground shrink-0"><Mic size={20}/></div>
+              <div className="bg-muted p-2 rounded-lg text-foreground shrink-0"><FolderOpen size={20} /></div>
               <div>
-                <h3 className="font-semibold text-foreground text-sm">Real-time Feedback</h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Play along using your microphone. The app analyzes your timing and pitch as you play, right in the browser.</p>
+                <h3 className="font-semibold text-foreground text-sm">Your GP files</h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Drop Guitar Pro files into <code className="text-xs bg-muted px-1 rounded">repository-exercises/</code> and they appear in the directory browser, loaded directly — no conversion step.</p>
               </div>
             </div>
-            
+
             <div className="flex gap-4 items-start">
-              <div className="bg-muted p-2 rounded-lg text-foreground shrink-0"><Crosshair size={20}/></div>
+              <div className="bg-muted p-2 rounded-lg text-foreground shrink-0"><Mic size={20} /></div>
               <div>
-                <h3 className="font-semibold text-foreground text-sm">Groove Lock</h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Get detailed post-exercise summaries showing whether you tend to rush or drag the beat.</p>
+                <h3 className="font-semibold text-foreground text-sm">Real-time feedback</h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Play along with your microphone. The app analyses your timing and pitch in the browser as you play.</p>
               </div>
             </div>
-            
+
             <div className="flex gap-4 items-start">
-              <div className="bg-muted p-2 rounded-lg text-foreground shrink-0"><Play size={20}/></div>
+              <div className="bg-muted p-2 rounded-lg text-foreground shrink-0"><Crosshair size={20} /></div>
               <div>
-                <h3 className="font-semibold text-foreground text-sm">Interactive Tablature</h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Loop sections, control the tempo, and use the built-in metronome to perfect difficult passages.</p>
+                <h3 className="font-semibold text-foreground text-sm">Groove Lock score</h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Post-exercise summary showing timing consistency, whether you rush or drag, and your best scores across sessions.</p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 items-start">
+              <div className="bg-muted p-2 rounded-lg text-foreground shrink-0"><Play size={20} /></div>
+              <div>
+                <h3 className="font-semibold text-foreground text-sm">Playback controls</h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Loop any section, adjust tempo, metronome with count-in and accent, and toggle between standard notation and tab.</p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 items-start">
+              <div className="bg-muted p-2 rounded-lg text-foreground shrink-0"><Music size={20} /></div>
+              <div>
+                <h3 className="font-semibold text-foreground text-sm">Tuner & metronome</h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Chromatic tuner with visual needle, and a standalone metronome with configurable subdivisions and click sounds.</p>
               </div>
             </div>
           </div>

@@ -3,6 +3,7 @@ import {
   AlphaTabApi,
   Settings,
   NotationElement,
+  StaveProfile as AlphaTabStaveProfile,
   synth,
   midi,
   model,
@@ -11,6 +12,7 @@ import type { Exercise } from '../data/exercises';
 import { extractTimedNotes, type TimedNote } from '../audio/noteExtractor';
 import { playClick as synthClick } from '../audio/clickSynth';
 import MetronomeSettings, { type MetronomeConfig } from './MetronomeSettings';
+import DisplaySettings, { loadStaveProfile, type StaveProfile } from './DisplaySettings';
 import BpmDisplay from './BpmDisplay';
 import MicFeedbackDisplay from './MicFeedbackDisplay';
 import type { PitchResult } from '../audio/pitchDetector';
@@ -22,6 +24,9 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { ChevronDown } from 'lucide-react';
+import { FaMicrophone, FaDrum, FaMusic } from 'react-icons/fa6';
+import { GiGuitar } from 'react-icons/gi';
+import { MdAudiotrack } from 'react-icons/md';
 import type { NoteEvaluation } from '../evaluation/types';
 import NoteEvaluationOverlay, { type BeatRect } from './NoteEvaluationOverlay';
 
@@ -32,6 +37,91 @@ const EVAL_ON_TIME_MS = 20;
 const EVAL_COLOR_HIT    = new model.Color(34, 197, 94);    // emerald-500
 const EVAL_COLOR_TIMING = new model.Color(245, 158, 11);   // amber-500
 const EVAL_COLOR_MISS   = new model.Color(239, 68, 68);    // red-500
+
+interface LoopHighlightRect {
+  barIndex: number;
+  startTick: number;
+  endTick: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Full staff-row y/h including both stave + tab stave */
+  rowY: number;
+  rowH: number;
+}
+
+interface LoopBeatRange {
+  beat: InstanceType<typeof model.Beat>;
+  startTick: number;
+  endTick: number;
+}
+
+type AlphaTabTrack = InstanceType<typeof model.Track>;
+
+function sameIndexes(left: number[], right: number[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  const normalizedLeft = [...left].sort((a, b) => a - b);
+  const normalizedRight = [...right].sort((a, b) => a - b);
+
+  return normalizedLeft.every((value, index) => value === normalizedRight[index]);
+}
+
+function getTrackLabel(track: AlphaTabTrack): string {
+  const name = track.name.trim();
+  if (name.length > 0) {
+    return name;
+  }
+
+  const shortName = track.shortName.trim();
+  if (shortName.length > 0) {
+    return shortName;
+  }
+
+  return `Track ${track.index + 1}`;
+}
+
+function getInstrumentIcon(track: AlphaTabTrack): React.ReactNode {
+  const label = getTrackLabel(track).toLowerCase();
+
+  if (/vocal|voice|lead|singer/i.test(label)) {
+    return <FaMicrophone size={18} aria-hidden="true" />;
+  }
+  if (/bass/i.test(label)) {
+    return <MdAudiotrack size={18} aria-hidden="true" />;
+  }
+  if (/drum|percussion|kit|kick|snare|hi.?hat/i.test(label)) {
+    return <FaDrum size={18} aria-hidden="true" />;
+  }
+  if (/piano|keys|keyboard/i.test(label)) {
+    return <FaMusic size={18} aria-hidden="true" />;
+  }
+  if (/guitar|gtr|lead|rhythm|acoustic|electric/i.test(label)) {
+    return <GiGuitar size={18} aria-hidden="true" />;
+  }
+  if (/synth|pad|arp|effect|string/i.test(label)) {
+    return <FaMusic size={18} aria-hidden="true" />;
+  }
+
+  return <FaMusic size={18} aria-hidden="true" />;
+}
+
+function getDefaultSelectedTrackIndex(tracks: AlphaTabTrack[]): number | null {
+  if (tracks.length === 0) {
+    return null;
+  }
+
+  const bassTrack = tracks.find((track) => /bass/i.test(getTrackLabel(track)));
+  if (bassTrack) {
+    return bassTrack.index;
+  }
+
+  const visibleTrack = tracks.find((track) => track.isVisibleOnMultiTrack);
+  return (visibleTrack ?? tracks[0]).index;
+}
 
 /** Imperative handle exposed via ref. */
 export interface AlphaTabHandle {
@@ -88,16 +178,91 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
   const onPositionChangeRef = useRef(onPositionChange);
   onPositionChangeRef.current = onPositionChange;
 
+  const refreshLoopBars = useCallback(() => {
+    const api = apiRef.current;
+    const score = api?.score;
+    const renderedTracks = api?.tracks.length ? api.tracks : score?.tracks ?? [];
+
+    if (!score || renderedTracks.length === 0 || renderedTracks[0].staves.length === 0) {
+      setLoopSelectableBeats([]);
+      loopBeatIndexMapRef.current = new Map();
+      return;
+    }
+
+    const firstStaff = renderedTracks[0].staves[0];
+    if (firstStaff.bars.length === 0) {
+      setLoopSelectableBeats([]);
+      loopBeatIndexMapRef.current = new Map();
+      return;
+    }
+
+    let maxTick = 0;
+    for (const track of renderedTracks) {
+      for (const staff of track.staves) {
+        for (const bar of staff.bars) {
+          for (const voice of bar.voices) {
+            for (const beat of voice.beats) {
+              maxTick = Math.max(maxTick, beat.absolutePlaybackStart + beat.playbackDuration);
+            }
+          }
+        }
+      }
+    }
+
+    const beats: LoopBeatRange[] = [];
+    const beatIndexMap = new Map<InstanceType<typeof model.Beat>, number>();
+    for (const staff of renderedTracks[0].staves) {
+      for (const bar of staff.bars) {
+        for (const voice of bar.voices) {
+          for (const beat of voice.beats) {
+            const startTick = beat.absolutePlaybackStart;
+            const endTick = startTick + beat.playbackDuration;
+            if (endTick <= startTick) {
+              continue;
+            }
+
+            const beatIndex = beats.length;
+            beatIndexMap.set(beat, beatIndex);
+            beats.push({ beat, startTick, endTick });
+          }
+        }
+      }
+    }
+
+    setLoopSelectableBeats(beats);
+    loopBeatIndexMapRef.current = beatIndexMap;
+  }, []);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [playerReady, setPlayerReady] = useState(false);
   const [tempo, setTempo] = useState(exercise.defaultTempo);
+  // For GP files loaded directly, defaultTempo is unknown upfront.
+  // We update this ref from api.masterBpm once playerReady fires.
+  const baseTempo = useRef(exercise.defaultTempo);
   const [currentTime, setCurrentTime] = useState(0);
   const [endTime, setEndTime] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
+  const [staveProfile, setStaveProfile] = useState<StaveProfile>(() => loadStaveProfile());
   const [beatBoundsMap, setBeatBoundsMap] = useState<Map<number, BeatRect>>(new Map());
   const [beatPulse, setBeatPulse] = useState(false);
+  const [loopSelectableBeats, setLoopSelectableBeats] = useState<LoopBeatRange[]>([]);
+  const [isLooping, setIsLooping] = useState(false);
+  const [hasLoopSelection, setHasLoopSelection] = useState(false);
+  const [isLoopDragging, setIsLoopDragging] = useState(false);
+  const [loopDragStartBeatIndex, setLoopDragStartBeatIndex] = useState<number | null>(null);
+  const [loopSelectionStartTick, setLoopSelectionStartTick] = useState<number | null>(null);
+  const [loopSelectionEndTick, setLoopSelectionEndTick] = useState<number | null>(null);
+  const [loopHighlightRects, setLoopHighlightRects] = useState<LoopHighlightRect[]>([]);
+  const [availableTracks, setAvailableTracks] = useState<AlphaTabTrack[]>([]);
+  const [selectedTrackIndex, setSelectedTrackIndex] = useState<number | null>(null);
+  const [mutedTrackIndexes, setMutedTrackIndexes] = useState<number[]>([]);
+  const [soloTrackIndexes, setSoloTrackIndexes] = useState<number[]>([]);
+  const [trackVolumes, setTrackVolumes] = useState<Record<number, number>>({});
+  const [activeVolumeTrackIndex, setActiveVolumeTrackIndex] = useState<number | null>(null);
   const beatPulseTimeoutRef = useRef<number | null>(null);
+  const activeVolumeTimeoutRef = useRef<number | null>(null);
+  const loopBeatIndexMapRef = useRef<Map<InstanceType<typeof model.Beat>, number>>(new Map());
   /** Map beatIndex → actual AlphaTab Beat object (for native note coloring). */
   const beatObjectMapRef = useRef<Map<number, InstanceType<typeof model.Beat>>>(new Map());
   /** Track which beatIndices already have styles applied (avoid redundant work). */
@@ -106,6 +271,24 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
   // Initialise AlphaTab
   useEffect(() => {
     if (!containerRef.current) return;
+
+    setIsPlaying(false);
+    setIsLoading(true);
+    setPlayerReady(false);
+    setCurrentTime(0);
+    setEndTime(0);
+    setAvailableTracks([]);
+    setSelectedTrackIndex(null);
+    setMutedTrackIndexes([]);
+    setSoloTrackIndexes([]);
+    setTrackVolumes({});
+    setLoopSelectableBeats([]);
+    setHasLoopSelection(false);
+    setIsLoopDragging(false);
+    setLoopDragStartBeatIndex(null);
+    setLoopSelectionStartTick(null);
+    setLoopSelectionEndTick(null);
+    setLoopHighlightRects([]);
 
     const api = new AlphaTabApi(containerRef.current, {
       core: {
@@ -116,6 +299,8 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
         staveProfile: 'Default',  // Standard notation + tab
         layoutMode: 0, // Page — wraps score onto multiple lines
         scale: 1.0,
+        systemPaddingTop: 20,
+        systemPaddingBottom: 20,
       },
       player: {
         enablePlayer: true,
@@ -144,6 +329,32 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     els.set(NotationElement.GuitarTuning, false);
     els.set(NotationElement.EffectTempo, false);
     // ── Events ────────────────────────────────────
+    api.scoreLoaded.on((score) => {
+      const nextTracks = score.tracks as AlphaTabTrack[];
+      const validIndexes = new Set(nextTracks.map((track) => track.index));
+
+      setAvailableTracks(nextTracks);
+      setSelectedTrackIndex((previous) => {
+        if (previous !== null && validIndexes.has(previous)) {
+          return previous;
+        }
+
+        return getDefaultSelectedTrackIndex(nextTracks);
+      });
+      setMutedTrackIndexes((previous) => previous.filter((index) => validIndexes.has(index)));
+      setSoloTrackIndexes((previous) => previous.filter((index) => validIndexes.has(index)));
+      setTrackVolumes((previous) => {
+        const nextVolumes: Record<number, number> = {};
+        for (const track of nextTracks) {
+          const previousVolume = previous[track.index];
+          nextVolumes[track.index] = typeof previousVolume === 'number'
+            ? Math.max(0, Math.min(previousVolume, 1.5))
+            : 1;
+        }
+        return nextVolumes;
+      });
+    });
+
     api.renderStarted.on(() => setIsLoading(true));
     api.renderFinished.on(() => {
       setIsLoading(false);
@@ -174,11 +385,18 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
         setBeatBoundsMap(map);
         beatObjectMapRef.current = beatObjMap;
       }
+      refreshLoopBars();
     });
 
     api.playerReady.on(() => {
       setPlayerReady(true);
+      refreshLoopBars();
       onReady?.();
+      // For GP files, read the actual tempo from the score instead of the placeholder.
+      if (exercise.filePath && api.score) {
+        baseTempo.current = api.score.tempo;
+        setTempo(api.score.tempo);
+      }
 
       // Extract note timing data once MIDI is loaded
       if (onNoteDataExtracted) {
@@ -202,8 +420,12 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
       onPositionChangeRef.current?.(args.currentTime);
     });
 
-    // Load the exercise tex
-    api.tex(exercise.tex);
+    // Load the exercise — GP binary file or AlphaTex string
+    if (exercise.filePath) {
+      api.load(exercise.filePath);
+    } else if (exercise.tex) {
+      api.tex(exercise.tex);
+    }
 
     return () => {
       api.destroy();
@@ -211,6 +433,258 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exercise.id]);
+
+  useEffect(() => {
+    const api = apiRef.current;
+    if (!api || availableTracks.length === 0 || selectedTrackIndex === null) {
+      return;
+    }
+
+    const nextTrack = availableTracks.find((track) => track.index === selectedTrackIndex);
+    if (!nextTrack) {
+      return;
+    }
+
+    const currentTrackIndexes = api.tracks.map((track) => track.index);
+    const nextTrackIndexes = [nextTrack.index];
+    if (sameIndexes(currentTrackIndexes, nextTrackIndexes)) {
+      return;
+    }
+
+    api.renderTracks([nextTrack]);
+  }, [availableTracks, selectedTrackIndex]);
+
+  useEffect(() => {
+    if (loopSelectableBeats.length === 0) {
+      setLoopDragStartBeatIndex(null);
+      setIsLoopDragging(false);
+      return;
+    }
+
+    if (loopDragStartBeatIndex !== null && loopDragStartBeatIndex >= loopSelectableBeats.length) {
+      setLoopDragStartBeatIndex(null);
+      setIsLoopDragging(false);
+    }
+  }, [loopDragStartBeatIndex, loopSelectableBeats]);
+
+  const refreshLoopHighlights = useCallback(() => {
+    const api = apiRef.current;
+    const lookup = api?.renderer.boundsLookup;
+
+    if (!lookup || loopSelectableBeats.length === 0) {
+      setLoopHighlightRects([]);
+      return;
+    }
+
+    // Build full-height row bounds from bar lineAlignedBounds (covers notation + tab stave)
+    const staffRowBounds: { y: number; h: number }[] = [];
+    for (const staffSystem of lookup.staffSystems) {
+      if (staffSystem.bars.length > 0) {
+        const b = staffSystem.bars[0].lineAlignedBounds
+          ?? staffSystem.bars[0].realBounds
+          ?? staffSystem.bars[0].visualBounds;
+        staffRowBounds.push({ y: b.y, h: b.h });
+      }
+    }
+
+    const rects: LoopHighlightRect[] = [];
+
+    for (const beatRange of loopSelectableBeats) {
+      const beatBounds = lookup.findBeat(beatRange.beat);
+      if (!beatBounds) {
+        continue;
+      }
+
+      const vb = beatBounds.visualBounds;
+      const beatCenterY = vb.y + vb.h / 2;
+      const row = staffRowBounds.find((r) => beatCenterY >= r.y && beatCenterY <= r.y + r.h)
+        ?? { y: vb.y, h: vb.h };
+
+      rects.push({
+        barIndex: 0,
+        startTick: beatRange.startTick,
+        endTick: beatRange.endTick,
+        x: vb.x,
+        y: vb.y,
+        w: vb.w,
+        h: vb.h,
+        rowY: row.y,
+        rowH: row.h,
+      });
+    }
+
+    setLoopHighlightRects(rects);
+  }, [loopSelectableBeats]);
+
+  useEffect(() => {
+    refreshLoopHighlights();
+  }, [refreshLoopHighlights]);
+
+  const setLoopRangeFromBeatIndexes = useCallback((startIndex: number, endIndex: number) => {
+    const clampedStart = Math.max(0, Math.min(startIndex, loopSelectableBeats.length - 1));
+    const clampedEnd = Math.max(0, Math.min(endIndex, loopSelectableBeats.length - 1));
+    const fromIndex = Math.min(clampedStart, clampedEnd);
+    const toIndex = Math.max(clampedStart, clampedEnd);
+
+    const startTick = loopSelectableBeats[fromIndex]?.startTick ?? null;
+    const endTick = loopSelectableBeats[toIndex]?.endTick ?? null;
+    if (startTick === null || endTick === null) {
+      return;
+    }
+
+    setLoopSelectionStartTick(startTick);
+    setLoopSelectionEndTick(endTick);
+    setHasLoopSelection(true);
+  }, [loopSelectableBeats]);
+
+  const applyLoopRangeForBeatIndexes = useCallback((startIndex: number, endIndex: number) => {
+    const api = apiRef.current;
+    if (!api || loopSelectableBeats.length === 0) return;
+
+    const clampedStart = Math.max(0, Math.min(startIndex, loopSelectableBeats.length - 1));
+    const clampedEnd = Math.max(0, Math.min(endIndex, loopSelectableBeats.length - 1));
+    const fromIndex = Math.min(clampedStart, clampedEnd);
+    const toIndex = Math.max(clampedStart, clampedEnd);
+
+    const startTick = loopSelectableBeats[fromIndex]?.startTick;
+    const endTick = loopSelectableBeats[toIndex]?.endTick;
+    if (startTick === undefined || endTick === undefined || endTick <= startTick) {
+      return;
+    }
+
+    api.playbackRange = { startTick, endTick };
+    api.isLooping = true;
+    setIsLooping(true);
+    setLoopSelectionStartTick(startTick);
+    setLoopSelectionEndTick(endTick);
+    setHasLoopSelection(true);
+  }, [loopSelectableBeats]);
+
+  const getBeatIndexFromPointerPosition = useCallback((clientX: number, clientY: number): number | null => {
+    const api = apiRef.current;
+    const lookup = api?.renderer.boundsLookup;
+    const scoreElement = containerRef.current;
+
+    if (!lookup || !scoreElement || loopSelectableBeats.length === 0) {
+      return null;
+    }
+
+    const rect = scoreElement.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const beat = lookup.getBeatAtPos(x, y) as InstanceType<typeof model.Beat> | null;
+
+    if (!beat) {
+      return null;
+    }
+
+    const mappedIndex = loopBeatIndexMapRef.current.get(beat);
+    if (mappedIndex === undefined) {
+      return null;
+    }
+
+    return mappedIndex;
+  }, [loopSelectableBeats]);
+
+  const handleLoopSelectionPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!isLooping || event.button !== 0) {
+      return;
+    }
+
+    const clickedBeatIndex = getBeatIndexFromPointerPosition(event.clientX, event.clientY);
+    if (clickedBeatIndex === null) {
+      return;
+    }
+
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    setIsLoopDragging(true);
+    setLoopDragStartBeatIndex(clickedBeatIndex);
+    setLoopRangeFromBeatIndexes(clickedBeatIndex, clickedBeatIndex);
+  }, [getBeatIndexFromPointerPosition, isLooping, setLoopRangeFromBeatIndexes]);
+
+  const handleLoopSelectionPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!isLooping || !isLoopDragging || loopDragStartBeatIndex === null) {
+      return;
+    }
+
+    const hoveredBeatIndex = getBeatIndexFromPointerPosition(event.clientX, event.clientY);
+    if (hoveredBeatIndex === null) {
+      return;
+    }
+
+    setLoopRangeFromBeatIndexes(loopDragStartBeatIndex, hoveredBeatIndex);
+  }, [getBeatIndexFromPointerPosition, isLoopDragging, isLooping, loopDragStartBeatIndex, setLoopRangeFromBeatIndexes]);
+
+  const handleLoopSelectionPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!isLooping || !isLoopDragging || loopDragStartBeatIndex === null) {
+      return;
+    }
+
+    const releasedBeatIndex = getBeatIndexFromPointerPosition(event.clientX, event.clientY) ?? loopDragStartBeatIndex;
+
+    event.preventDefault();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    setIsLoopDragging(false);
+    setLoopDragStartBeatIndex(null);
+    applyLoopRangeForBeatIndexes(loopDragStartBeatIndex, releasedBeatIndex);
+  }, [applyLoopRangeForBeatIndexes, getBeatIndexFromPointerPosition, isLoopDragging, isLooping, loopDragStartBeatIndex]);
+
+  const handleLoopSelectionPointerCancel = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!isLoopDragging) {
+      return;
+    }
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    setIsLoopDragging(false);
+    setLoopDragStartBeatIndex(null);
+  }, [isLoopDragging]);
+
+  useEffect(() => {
+    const api = apiRef.current;
+    if (!api || availableTracks.length === 0) {
+      return;
+    }
+
+    const mutedSet = new Set(mutedTrackIndexes);
+    const soloSet = new Set(soloTrackIndexes);
+
+    for (const track of availableTracks) {
+      api.changeTrackSolo([track], false);
+      api.changeTrackMute([track], false);
+    }
+
+    for (const track of availableTracks) {
+      if (mutedSet.has(track.index)) {
+        api.changeTrackMute([track], true);
+      }
+    }
+
+    for (const track of availableTracks) {
+      if (soloSet.has(track.index)) {
+        api.changeTrackSolo([track], true);
+      }
+    }
+  }, [availableTracks, mutedTrackIndexes, soloTrackIndexes]);
+
+  useEffect(() => {
+    const api = apiRef.current;
+    if (!api || availableTracks.length === 0) {
+      return;
+    }
+
+    for (const track of availableTracks) {
+      const volume = trackVolumes[track.index] ?? 1;
+      api.changeTrackVolume([track], volume);
+    }
+  }, [availableTracks, trackVolumes]);
 
   // ── Apply note colours via AlphaTab model styles ────────
   // Colours: green (hit, good timing), amber (hit, off timing), red (miss)
@@ -322,7 +796,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     (newTempo: number) => {
       if (!apiRef.current) return;
       setTempo(newTempo);
-      apiRef.current.playbackSpeed = newTempo / exercise.defaultTempo;
+      apiRef.current.playbackSpeed = newTempo / baseTempo.current;
     },
     [exercise.defaultTempo],
   );
@@ -333,6 +807,23 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     apiRef.current.masterVolume = next ? 0 : 1;
     setIsMuted(next);
   }, [isMuted]);
+
+  // ── Stave profile (notation display) ─────────────
+  const STAVE_PROFILE_MAP: Record<StaveProfile, AlphaTabStaveProfile> = {
+    Default: AlphaTabStaveProfile.ScoreTab,
+    Score:   AlphaTabStaveProfile.Score,
+    Tab:     AlphaTabStaveProfile.Tab,
+  };
+
+  useEffect(() => {
+    const api = apiRef.current;
+    if (!api || !playerReady) return;
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
+    api.settings.display.staveProfile = STAVE_PROFILE_MAP[staveProfile];
+    api.updateSettings();
+    api.render();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staveProfile, playerReady]);
 
   // ── Metronome volume management ─────────────────
   // AlphaTab's built-in metronome is sample-accurate (rendered into the same
@@ -361,7 +852,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     } else {
       // Use built-in metronome — perfectly in sync with playback.
       apiRef.current.metronomeVolume = cfg.enabled ? 1 : 0;
-      apiRef.current.countInVolume = cfg.countInBars > 0 ? 1 : 0;
+      apiRef.current.countInVolume = cfg.enabled && cfg.countInBars > 0 ? 1 : 0;
     }
   }, [metronomeConfig, useCustomClicks]);
 
@@ -418,12 +909,104 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
   }, [playClick, triggerBeatPulse]);
 
   // Looping
-  const [isLooping, setIsLooping] = useState(false);
   const toggleLoop = useCallback(() => {
-    if (!apiRef.current) return;
-    apiRef.current.isLooping = !isLooping;
-    setIsLooping(!isLooping);
-  }, [isLooping]);
+    const api = apiRef.current;
+    if (!api) return;
+
+    if (isLooping) {
+      api.isLooping = false;
+      api.playbackRange = null;
+      setIsLooping(false);
+      setIsLoopDragging(false);
+      setLoopDragStartBeatIndex(null);
+      return;
+    }
+
+    setIsLoopDragging(false);
+    setLoopDragStartBeatIndex(null);
+
+    if (hasLoopSelection && loopSelectionStartTick !== null && loopSelectionEndTick !== null && loopSelectionEndTick > loopSelectionStartTick) {
+      api.playbackRange = { startTick: loopSelectionStartTick, endTick: loopSelectionEndTick };
+      api.isLooping = true;
+      setIsLooping(true);
+      return;
+    }
+
+    if (loopSelectableBeats.length === 0) {
+      return;
+    }
+
+    setLoopRangeFromBeatIndexes(0, 0);
+    applyLoopRangeForBeatIndexes(0, 0);
+  }, [applyLoopRangeForBeatIndexes, hasLoopSelection, isLooping, loopSelectableBeats.length, loopSelectionEndTick, loopSelectionStartTick, setLoopRangeFromBeatIndexes]);
+
+  const toggleTrackMute = useCallback((trackIndex: number) => {
+    setMutedTrackIndexes((previous) => (
+      previous.includes(trackIndex)
+        ? previous.filter((index) => index !== trackIndex)
+        : [...previous, trackIndex].sort((left, right) => left - right)
+    ));
+    setSoloTrackIndexes((previous) => previous.filter((index) => index !== trackIndex));
+  }, []);
+
+  const toggleTrackSolo = useCallback((trackIndex: number) => {
+    setSoloTrackIndexes((previous) => (
+      previous.includes(trackIndex)
+        ? previous.filter((index) => index !== trackIndex)
+        : [...previous, trackIndex].sort((left, right) => left - right)
+    ));
+    setMutedTrackIndexes((previous) => previous.filter((index) => index !== trackIndex));
+  }, []);
+
+  const setTrackVolume = useCallback((trackIndex: number, nextVolumePercent: number) => {
+    const clampedPercent = Math.max(0, Math.min(nextVolumePercent, 150));
+    const normalizedVolume = clampedPercent / 100;
+
+    if (activeVolumeTimeoutRef.current !== null) {
+      window.clearTimeout(activeVolumeTimeoutRef.current);
+    }
+    setActiveVolumeTrackIndex(trackIndex);
+    activeVolumeTimeoutRef.current = window.setTimeout(() => {
+      setActiveVolumeTrackIndex((current) => (current === trackIndex ? null : current));
+      activeVolumeTimeoutRef.current = null;
+    }, 900);
+
+    setTrackVolumes((previous) => ({
+      ...previous,
+      [trackIndex]: normalizedVolume,
+    }));
+  }, []);
+
+  useEffect(() => () => {
+    if (activeVolumeTimeoutRef.current !== null) {
+      window.clearTimeout(activeVolumeTimeoutRef.current);
+    }
+  }, []);
+
+  // Merge selected beat rects into one rectangle per staff row
+  const loopSelectionMergedRects = (() => {
+    if (!isLooping || !hasLoopSelection || loopSelectionStartTick === null || loopSelectionEndTick === null) {
+      return [];
+    }
+
+    const byRow = new Map<number, { minX: number; maxX: number; rowY: number; rowH: number }>();
+
+    for (const rect of loopHighlightRects) {
+      if (rect.endTick <= loopSelectionStartTick || rect.startTick >= loopSelectionEndTick) {
+        continue;
+      }
+
+      const existing = byRow.get(rect.rowY);
+      if (existing) {
+        existing.minX = Math.min(existing.minX, rect.x);
+        existing.maxX = Math.max(existing.maxX, rect.x + rect.w);
+      } else {
+        byRow.set(rect.rowY, { minX: rect.x, maxX: rect.x + rect.w, rowY: rect.rowY, rowH: rect.rowH });
+      }
+    }
+
+    return Array.from(byRow.values());
+  })();
 
   // Expose transport actions to parent via ref
   useImperativeHandle(ref, () => ({
@@ -509,28 +1092,140 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
 
         {/* ── Right group: controls ── */}
         <div className="flex items-center gap-1.5 shrink-0">
+          {availableTracks.length > 1 && (
+            <>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    disabled={!playerReady}
+                    className="h-8 px-2 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-40 inline-flex items-center gap-1.5"
+                    title="Track selection and mixer"
+                    aria-label="Track selection and mixer"
+                  >
+                    <span className="max-w-40 truncate">
+                      {selectedTrackIndex === null
+                        ? `Tracks ${availableTracks.length}`
+                        : getTrackLabel(availableTracks.find((track) => track.index === selectedTrackIndex) ?? availableTracks[0])}
+                    </span>
+                    <ChevronDown size={12} className="opacity-70" aria-hidden="true" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[26rem] p-4 max-h-[75vh]" align="end" sideOffset={8}>
+                  <div className="space-y-3">
+                    <div>
+                      <h4 className="text-sm font-semibold text-foreground">Tracks</h4>
+                      <p className="text-[11px] text-muted-foreground">Choose the single notation track and control playback mute or solo.</p>
+                    </div>
+                    <div className="space-y-2 overflow-y-auto pr-1 max-h-[calc(75vh-6.5rem)]">
+                      {availableTracks.map((track) => {
+                        const isSelected = selectedTrackIndex === track.index;
+                        const isMutedTrack = mutedTrackIndexes.includes(track.index);
+                        const isSoloTrack = soloTrackIndexes.includes(track.index);
+                        const volumePercent = Math.round((trackVolumes[track.index] ?? 1) * 100);
+
+                        return (
+                          <div
+                            key={`track-${track.index}`}
+                            className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border px-2 py-1.5 transition-colors ${
+                              isSelected
+                                ? 'border-primary/30 bg-primary/5'
+                                : 'border-border/70 bg-background/60'
+                            }`}
+                          >
+                            <div
+                              className={`min-w-0 space-y-1 rounded-md px-1.5 py-1 transition-colors ${
+                                isSelected
+                                  ? 'text-primary'
+                                  : 'text-foreground hover:bg-secondary/80'
+                              }`}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => setSelectedTrackIndex(track.index)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault();
+                                  setSelectedTrackIndex(track.index);
+                                }
+                              }}
+                              aria-label={isSelected ? `${getTrackLabel(track)} is active for notation` : `Set ${getTrackLabel(track)} as the active notation track`}
+                              aria-pressed={isSelected}
+                            >
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className={`h-1 w-1 rounded-full shrink-0 transition-opacity ${isSelected ? 'bg-primary opacity-100' : 'bg-primary opacity-0'}`} aria-hidden="true" />
+                                <span className={`h-8 w-8 inline-flex items-center justify-center shrink-0 rounded transition-colors ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
+                                  {getInstrumentIcon(track)}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <p className={`truncate text-xs font-medium ${isSelected ? 'text-primary' : 'text-foreground'}`}>{getTrackLabel(track)}</p>
+                                </div>
+                              </div>
+                              <div
+                                className="space-y-1 pl-[3.75rem] pr-1 group"
+                                onClick={(event) => event.stopPropagation()}
+                                onPointerDown={(event) => event.stopPropagation()}
+                              >
+                                <Slider
+                                  min={0}
+                                  max={150}
+                                  step={5}
+                                  value={[volumePercent]}
+                                  onValueChange={([value]) => setTrackVolume(track.index, value)}
+                                  aria-label={`Volume for ${getTrackLabel(track)}`}
+                                  className={`[&_[role=slider]]:h-3 [&_[role=slider]]:w-3 hover:[&_[role=slider]]:h-4 hover:[&_[role=slider]]:w-4 [&_[data-slot=slider-range]]:bg-muted-foreground/40 [&_[data-slot=slider-thumb]]:border-muted-foreground/40 [&_[data-slot=slider-thumb]]:bg-background group-hover:[&_[data-slot=slider-range]]:bg-primary group-hover:[&_[data-slot=slider-thumb]]:border-primary ${activeVolumeTrackIndex === track.index ? '[&_[data-slot=slider-range]]:bg-primary [&_[data-slot=slider-thumb]]:border-primary' : ''}`}
+                                />
+                                <div className={`text-[10px] text-muted-foreground text-right tabular-nums h-3 transition-opacity ${activeVolumeTrackIndex === track.index ? 'opacity-100' : 'opacity-0'}`}>{volumePercent}%</div>
+                              </div>
+                            </div>
+                            <div className="flex gap-0.5 shrink-0">
+                              <button
+                                onClick={() => toggleTrackMute(track.index)}
+                                className={`h-7 w-7 rounded-l-md inline-flex items-center justify-center text-xs font-semibold transition-colors ${
+                                  isMutedTrack
+                                    ? 'bg-destructive/10 text-destructive'
+                                    : 'bg-secondary text-muted-foreground hover:text-foreground'
+                                }`}
+                                aria-label={isMutedTrack ? `Unmute ${getTrackLabel(track)}` : `Mute ${getTrackLabel(track)}`}
+                                aria-pressed={isMutedTrack}
+                                title={isMutedTrack ? 'Unmute' : 'Mute'}
+                              >
+                                M
+                              </button>
+                              <button
+                                onClick={() => toggleTrackSolo(track.index)}
+                                className={`h-7 w-7 rounded-r-md inline-flex items-center justify-center text-xs font-semibold transition-colors ${
+                                  isSoloTrack
+                                    ? 'bg-amber-500/15 text-amber-600'
+                                    : 'bg-secondary text-muted-foreground hover:text-foreground'
+                                }`}
+                                aria-label={isSoloTrack ? `Disable solo for ${getTrackLabel(track)}` : `Solo ${getTrackLabel(track)}`}
+                                aria-pressed={isSoloTrack}
+                                title={isSoloTrack ? 'Disable solo' : 'Solo'}
+                              >
+                                S
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </>
+          )}
+
           {/* Tempo */}
           <BpmDisplay
             value={tempo}
             onChange={changeSpeed}
             disabled={!playerReady}
+            showPulse={isPlaying}
+            beatPulse={beatPulse}
           />
-          {isPlaying && (
-            <div
-              className={`w-2 h-2 rounded-full shrink-0 transition-all duration-100 ease-out ${
-                beatPulse
-                  ? 'bg-primary scale-125 opacity-100'
-                  : 'bg-primary/20 scale-100 opacity-60'
-              }`}
-              aria-hidden="true"
-            />
-          )}
 
           {/* Mic / Speaker section */}
           {onToggleMic && (
             <>
-              <div className="w-px h-6 bg-border" role="presentation" />
-
               {/* Mute playback */}
               <button
                 onClick={toggleMute}
@@ -695,6 +1390,13 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
             onChange={onMetronomeConfigChange}
             disabled={!playerReady}
           />
+
+          {/* Display settings popover */}
+          <DisplaySettings
+            staveProfile={staveProfile}
+            onChange={setStaveProfile}
+            disabled={!playerReady}
+          />
         </div>
       </div>
 
@@ -726,8 +1428,25 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
             </div>
           </div>
         )}
-        <div className="relative">
+        <div
+          className={`relative ${isLooping ? 'cursor-ew-resize' : ''}`}
+          onPointerDown={handleLoopSelectionPointerDown}
+          onPointerMove={handleLoopSelectionPointerMove}
+          onPointerUp={handleLoopSelectionPointerUp}
+          onPointerCancel={handleLoopSelectionPointerCancel}
+        >
           <div ref={containerRef} className="at-main" />
+          {isLooping && loopSelectionMergedRects.length > 0 && (
+            <div className="absolute inset-0 pointer-events-none z-[2]">
+              {loopSelectionMergedRects.map((r, i) => (
+                <div
+                  key={`loop-sel-${i}`}
+                  className="absolute rounded ring-2 ring-primary/80 bg-primary/10"
+                  style={{ left: r.minX, top: r.rowY, width: r.maxX - r.minX, height: r.rowH }}
+                />
+              ))}
+            </div>
+          )}
           {noteEvaluations.length > 0 && beatBoundsMap.size > 0 && (
             <NoteEvaluationOverlay
               evaluations={noteEvaluations}

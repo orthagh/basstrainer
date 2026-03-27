@@ -5,6 +5,8 @@ export interface Exercise {
   difficulty: 'beginner' | 'intermediate' | 'advanced';
   category: string;
   defaultTempo: number;
-  /** AlphaTex source for the exercise */
-  tex: string;
+  /** AlphaTex source — used for built-in exercises */
+  tex?: string;
+  /** URL to a GP binary file — used for directory exercises */
+  filePath?: string;
 }

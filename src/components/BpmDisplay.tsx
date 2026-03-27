@@ -7,6 +7,8 @@ interface BpmDisplayProps {
   disabled?: boolean;
   min?: number;
   max?: number;
+  beatPulse?: boolean;
+  showPulse?: boolean;
 }
 
 const CLAMP = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -17,6 +19,8 @@ export default function BpmDisplay({
   disabled = false,
   min = 40,
   max = 200,
+  beatPulse = false,
+  showPulse = false,
 }: BpmDisplayProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(value));
@@ -64,7 +68,15 @@ export default function BpmDisplay({
   );
 
   return (
-    <div className="flex items-center gap-1.5 select-none bg-muted rounded-lg px-2 py-1.5" role="group" aria-label="Tempo setting">
+    <div className="relative flex items-center gap-1.5 select-none bg-muted rounded-lg px-2 py-1.5" role="group" aria-label="Tempo setting">
+      {showPulse && (
+        <div
+          className={`absolute top-1 right-3 w-1.5 h-1.5 rounded-full transition-all duration-100 ease-out ${
+            beatPulse ? 'bg-primary scale-125 opacity-100' : 'bg-primary/30 scale-100 opacity-60'
+          }`}
+          aria-hidden="true"
+        />
+      )}
       {/* −1 button */}
       <button
         onClick={() => nudge(-1)}

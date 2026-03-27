@@ -9,6 +9,7 @@ import { alphaTab } from '@coderline/alphatab-vite'
 export default defineConfig({
   base: '/basstrainer/',
   plugins: [react(), tailwindcss(), alphaTab()],
+  assetsInclude: ['**/*.gp', '**/*.gpx', '**/*.gp3', '**/*.gp4', '**/*.gp5'],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

@@ -65,36 +65,39 @@ export default function MetronomeSettings({
     [config, onChange],
   );
 
+  const active = config.enabled;
+
   return (
     <Popover>
-      <PopoverTrigger asChild>
+      <div className={`flex items-center rounded-lg overflow-hidden transition-colors ${active ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`}>
+        {/* Toggle button — left part */}
         <button
           disabled={disabled}
-          className={`flex items-center gap-0.5 p-2 rounded-lg transition-colors disabled:opacity-40 ${
-            config.enabled
-              ? 'bg-primary/10 text-primary'
-              : 'text-muted-foreground hover:bg-muted'
-          }`}
-          title="Metronome settings"
+          onClick={() => update({ enabled: !active })}
+          className="flex items-center p-2 transition-colors disabled:opacity-40 hover:bg-black/5 dark:hover:bg-white/10 rounded-l-lg"
+          title={active ? 'Disable metronome' : 'Enable metronome'}
         >
           <MetronomeIcon size={18} />
-          <ChevronDown size={10} className="opacity-50" />
         </button>
-      </PopoverTrigger>
+
+        {/* Separator — only visible when active */}
+        {active && <div className="w-px h-4 bg-primary/30" />}
+
+        {/* Popover trigger — right part (chevron) */}
+        <PopoverTrigger asChild>
+          <button
+            disabled={disabled}
+            className="flex items-center px-1.5 py-2 transition-colors disabled:opacity-40 hover:bg-black/5 dark:hover:bg-white/10 rounded-r-lg"
+            title="Metronome settings"
+          >
+            <ChevronDown size={12} className="opacity-60" />
+          </button>
+        </PopoverTrigger>
+      </div>
       <PopoverContent className="w-64 p-4" align="end" sideOffset={8}>
         <div className="space-y-4">
-          {/* Header + toggle */}
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-foreground">Metronome</h4>
-            <Toggle
-              pressed={config.enabled}
-              onPressedChange={(pressed) => update({ enabled: pressed })}
-              size="sm"
-              className="data-[state=on]:bg-primary/10 data-[state=on]:text-primary"
-            >
-              {config.enabled ? 'ON' : 'OFF'}
-            </Toggle>
-          </div>
+          {/* Header */}
+          <h4 className="text-sm font-semibold text-foreground">Metronome settings</h4>
 
           <Separator />
 
