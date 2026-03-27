@@ -1,5 +1,7 @@
 # Bass Groove Trainer
 
+![Bass Groove Trainer](screenshot.png)
+
 A personal browser-based practice tool for bass. Drop in your Guitar Pro files, plug in your mic, and play along — the app listens in real time and tells you how tight your groove is.
 
 ## What it does
