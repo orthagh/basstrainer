@@ -254,7 +254,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
   const [staveProfile, setStaveProfile] = useState<StaveProfile>(() => loadStaveProfile());
   const [beatBoundsMap, setBeatBoundsMap] = useState<Map<number, BeatRect>>(new Map());
   const [sections, setSections] = useState<SectionMarker[]>([]);
-  const [beatPulse, setBeatPulse] = useState(false);
+
   const [loopSelectableBeats, setLoopSelectableBeats] = useState<LoopBeatRange[]>([]);
   const [isLooping, setIsLooping] = useState(false);
   const [hasLoopSelection, setHasLoopSelection] = useState(false);
@@ -271,7 +271,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
   const [activeVolumeTrackIndex, setActiveVolumeTrackIndex] = useState<number | null>(null);
   const [isTracksPanelOpen, setIsTracksPanelOpen] = useState(false);
   const [scoreInfo, setScoreInfo] = useState<{ title: string; artist: string; tunings: Map<number, string[]> } | null>(null);
-  const beatPulseTimeoutRef = useRef<number | null>(null);
+
   const activeVolumeTimeoutRef = useRef<number | null>(null);
   const loopBeatIndexMapRef = useRef<Map<InstanceType<typeof model.Beat>, number>>(new Map());
   /** Map beatIndex → actual AlphaTab Beat object (for native note coloring). */
@@ -919,19 +919,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     synthClick(cfg.clickSound, accent && cfg.accentFirstBeat, cfg.volume ?? 1);
   }, []);
 
-  // Beat pulse — brief visual flash on each beat
-  const triggerBeatPulse = useCallback(() => {
-    if (beatPulseTimeoutRef.current !== null) {
-      clearTimeout(beatPulseTimeoutRef.current);
-    }
-    setBeatPulse(true);
-    beatPulseTimeoutRef.current = window.setTimeout(() => {
-      setBeatPulse(false);
-      beatPulseTimeoutRef.current = null;
-    }, 120);
-  }, []);
-
-  // Subscribe to AlphaTab metronome MIDI events for beat pulse & custom click
+// Subscribe to AlphaTab metronome MIDI events for custom click
   useEffect(() => {
     const api = apiRef.current;
     if (!api) return;
@@ -940,8 +928,6 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
       for (const evt of e.events) {
         const me = evt as { isMetronome?: boolean; metronomeNumerator?: number };
         if (me.isMetronome) {
-          // Always pulse on beat
-          triggerBeatPulse();
           // Custom click sound (only when a non-default sound or accent is active)
           const cfg = metronomeConfigRef.current;
           if (cfg.enabled && (cfg.accentFirstBeat || cfg.clickSound !== 'default')) {
@@ -958,7 +944,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     return () => {
       api.midiEventsPlayed.off(handleEvents);
     };
-  }, [playClick, triggerBeatPulse]);
+  }, [playClick]);
 
   // Looping
   const toggleLoop = useCallback(() => {
@@ -1167,8 +1153,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
             value={tempo}
             onChange={changeSpeed}
             disabled={!playerReady}
-            showPulse={isPlaying}
-            beatPulse={beatPulse}
+
           />
 
           {/* Mic / Speaker section */}
