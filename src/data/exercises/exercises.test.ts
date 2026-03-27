@@ -45,7 +45,7 @@ describe('exercises data integrity', () => {
 
   it('defaultTempo matches the \\tempo in the AlphaTex', () => {
     for (const ex of exercises) {
-      const match = ex.tex.match(/\\tempo\s+(\d+)/);
+      const match = ex.tex!.match(/\\tempo\s+(\d+)/);
       expect(match, `${ex.id}: could not parse \\tempo from tex`).not.toBeNull();
       if (match) {
         expect(Number(match[1]), `${ex.id}: defaultTempo (${ex.defaultTempo}) ≠ \\tempo (${match[1]})`).toBe(
