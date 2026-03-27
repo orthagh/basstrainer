@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Tuner from './Tuner';
 import type { PitchResult } from '../audio/pitchDetector';
 import { Mic } from 'lucide-react';
@@ -12,6 +12,7 @@ export interface TunerPageProps {
 }
 
 export default function TunerPage({ isListening: globalListening, currentPitch: globalPitch, audioStart, audioError }: TunerPageProps) {
+  const hasAutoStartedRef = useRef(false);
   const [autoStartAttempted, setAutoStartAttempted] = useState(false);
 
   /**
@@ -19,13 +20,15 @@ export default function TunerPage({ isListening: globalListening, currentPitch: 
    * If the browser denies autoplay or permissions, we'll show a fallback button.
    */
   useEffect(() => {
-    if (!autoStartAttempted && audioStart && !globalListening) {
+    if (!hasAutoStartedRef.current && audioStart && !globalListening) {
+      hasAutoStartedRef.current = true;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAutoStartAttempted(true);
       audioStart().catch(() => {
         // Silently catch errors — we'll show the button instead
       });
     }
-  }, [audioStart, globalListening, autoStartAttempted]);
+  }, [audioStart, globalListening]);
 
   const isListening = globalListening ?? false;
   const currentPitch = globalPitch ?? null;

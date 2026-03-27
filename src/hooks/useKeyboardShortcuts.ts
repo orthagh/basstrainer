@@ -12,7 +12,7 @@
  *   ?          → Show shortcut help (future)
  */
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 
 export interface KeyboardShortcutActions {
   playPause: () => void;
@@ -26,66 +26,66 @@ export interface KeyboardShortcutActions {
 }
 
 export function useKeyboardShortcuts(actions: KeyboardShortcutActions) {
-  const actionsRef = useRef(actions);
-  actionsRef.current = actions;
+  const handlerRef = useRef<((e: KeyboardEvent) => void) | null>(null);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const a = actionsRef.current;
-      if (!a.enabled) return;
+  const handler = useCallback((e: KeyboardEvent) => {
+    if (!actions.enabled) return;
 
-      // Always swallow Space & arrows to prevent page / element scrolling,
-      // even before we check the target element.
-      if (
-        e.code === 'Space' ||
-        e.code === 'ArrowLeft' ||
-        e.code === 'ArrowRight' ||
-        e.code === 'ArrowUp' ||
-        e.code === 'ArrowDown'
-      ) {
-        // …but let the user type in text inputs normally.
-        const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-        const editable = (e.target as HTMLElement)?.isContentEditable;
-        if (tag === 'input' || tag === 'textarea' || tag === 'select' || editable) return;
-        e.preventDefault();
-      }
-
-      // Don't fire shortcuts when typing in inputs / textareas / selects
+    if (
+      e.code === 'Space' ||
+      e.code === 'ArrowLeft' ||
+      e.code === 'ArrowRight' ||
+      e.code === 'ArrowUp' ||
+      e.code === 'ArrowDown'
+    ) {
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       const editable = (e.target as HTMLElement)?.isContentEditable;
       if (tag === 'input' || tag === 'textarea' || tag === 'select' || editable) return;
+      e.preventDefault();
+    }
 
-      switch (e.code) {
-        case 'Space':
-          a.playPause();
-          break;
-        case 'Escape':
-          a.stop();
-          break;
-        case 'KeyL':
-          a.toggleLoop();
-          break;
-        case 'KeyM':
-          a.toggleMetronome();
-          break;
-        case 'KeyF':
-          a.toggleFullscreen();
-          break;
-        case 'ArrowLeft':
-          a.tempoChange(-5);
-          break;
-        case 'ArrowRight':
-          a.tempoChange(5);
-          break;
-        case 'ArrowDown':
-          a.tempoChange(-1);
-          break;
-        case 'ArrowUp':
-          a.tempoChange(1);
-          break;
-      }
-    };
+    const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+    const editable = (e.target as HTMLElement)?.isContentEditable;
+    if (tag === 'input' || tag === 'textarea' || tag === 'select' || editable) return;
 
+    switch (e.code) {
+      case 'Space':
+        actions.playPause();
+        break;
+      case 'Escape':
+        actions.stop();
+        break;
+      case 'KeyL':
+        actions.toggleLoop();
+        break;
+      case 'KeyM':
+        actions.toggleMetronome();
+        break;
+      case 'KeyF':
+        actions.toggleFullscreen();
+        break;
+      case 'ArrowLeft':
+        actions.tempoChange(-5);
+        break;
+      case 'ArrowRight':
+        actions.tempoChange(5);
+        break;
+      case 'ArrowDown':
+        actions.tempoChange(-1);
+        break;
+      case 'ArrowUp':
+        actions.tempoChange(1);
+        break;
+    }
+  }, [actions]);
+
+  // Store latest handler in a ref so the effect below can always re-register the current one.
+  useLayoutEffect(() => {
+    handlerRef.current = handler;
+  });
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => handlerRef.current?.(e);
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);

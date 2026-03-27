@@ -6,7 +6,7 @@
  * shortcuts (Space / Escape / arrow keys) to the active page.
  */
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
 import { SlidersHorizontal, Volume2 } from 'lucide-react';
 import { useMetronome, type MetronomeHandle } from '../hooks/useMetronome';
 import RhythmPicker from './RhythmPicker';
@@ -39,27 +39,22 @@ const MetronomePage = forwardRef<MetronomeHandle>((_props, ref) => {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [tapWave, setTapWave] = useState(0);
   const [elapsed, setElapsed] = useState(0);
-  const startTimeRef = useRef<number | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (m.isRunning) {
-      startTimeRef.current = Date.now() - elapsed * 1000;
-      timerRef.current = setInterval(() => {
-        setElapsed(Math.floor((Date.now() - startTimeRef.current!) / 1000));
-      }, 500);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
-      setElapsed(0);
-      startTimeRef.current = null;
-    }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    if (!m.isRunning) return;
+    const startTime = Date.now();
+    const timer = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTime) / 1000));
+    }, 500);
+    return () => clearInterval(timer);
   }, [m.isRunning]);
+
+  const displayElapsed = m.isRunning ? elapsed : 0;
 
   const handleTap = useCallback(() => {
     m.tap();
     setTapWave((n) => n + 1);
-  }, [m.tap]);
+  }, [m]);
 
   // Expose imperative controls for App.tsx keyboard shortcuts
   useImperativeHandle(
@@ -141,7 +136,7 @@ const MetronomePage = forwardRef<MetronomeHandle>((_props, ref) => {
                   <span className="flex items-center justify-center gap-3 text-lg">
                     <span aria-hidden="true" className="text-base leading-none relative -top-0.5">■</span>
                     <span className="tabular-nums font-mono leading-none">
-                      {String(Math.floor(elapsed / 60)).padStart(2, '0')}:{String(elapsed % 60).padStart(2, '0')}
+                      {String(Math.floor(displayElapsed / 60)).padStart(2, '0')}:{String(displayElapsed % 60).padStart(2, '0')}
                     </span>
                   </span>
                   <span className="text-xs font-semibold opacity-70 tabular-nums">Bar {m.currentBar}</span>

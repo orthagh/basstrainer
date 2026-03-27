@@ -60,16 +60,16 @@ export function useDemoMode(options: UseDemoModeOptions): UseDemoModeReturn {
   // Track which notes we've already "played"
   const playedIndicesRef = useRef<Set<number>>(new Set());
   const startTimeRef = useRef(0);
+  const wasPlayingRef = useRef(false);
 
-  // Reset when playback starts or exercise changes
+  // Reset when playback starts
   useEffect(() => {
-    if (isPlaying && enabled) {
+    if (isPlaying && enabled && !wasPlayingRef.current) {
       playedIndicesRef.current = new Set();
       startTimeRef.current = performance.now();
-      setLastNote(null);
-      setCurrentPitch({ frequency: null, midi: null, noteName: null, rms: 0 });
     }
-  }, [isPlaying, enabled, expectedNotes]);
+    wasPlayingRef.current = isPlaying;
+  }, [isPlaying, enabled]);
 
   // Polling loop — check score position and emit simulated notes
   useEffect(() => {

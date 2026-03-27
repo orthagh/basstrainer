@@ -12,7 +12,8 @@ import type { Exercise } from '../data/exercises';
 import { extractTimedNotes, type TimedNote } from '../audio/noteExtractor';
 import { playClick as synthClick } from '../audio/clickSynth';
 import MetronomeSettings, { type MetronomeConfig } from './MetronomeSettings';
-import DisplaySettings, { loadStaveProfile, type StaveProfile } from './DisplaySettings';
+import DisplaySettings from './DisplaySettings';
+import { loadStaveProfile, type StaveProfile } from '@/lib/displaySettings';
 import BpmDisplay from './BpmDisplay';
 import MicFeedbackDisplay from './MicFeedbackDisplay';
 import type { PitchResult } from '../audio/pitchDetector';
@@ -798,7 +799,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
       setTempo(newTempo);
       apiRef.current.playbackSpeed = newTempo / baseTempo.current;
     },
-    [exercise.defaultTempo],
+    [],
   );
 
   const toggleMute = useCallback(() => {
@@ -818,7 +819,6 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
   useEffect(() => {
     const api = apiRef.current;
     if (!api || !playerReady) return;
-    // eslint-disable-next-line @typescript-eslint/no-deprecated
     api.settings.display.staveProfile = STAVE_PROFILE_MAP[staveProfile];
     api.updateSettings();
     api.render();

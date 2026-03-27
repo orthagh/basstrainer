@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Keyboard, RotateCcw, Info, AudioLines, FolderTree } from 'lucide-react';
 import MetronomeIcon from './components/MetronomeIcon';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -136,9 +136,6 @@ function App() {
     scorePositionRef.current = ms;
   }, []);
 
-  // Evaluation hook — only active when enabled + mic/demo on + playing
-  const [previousBest, setPreviousBest] = useState<number | null>(null);
-
   const evaluation = useEvaluation({
     expectedNotes: noteData,
     isPlaying,
@@ -148,15 +145,20 @@ function App() {
     scorePositionRef,
   });
 
+  // Snapshot the best score before this run so PostExerciseSummary can compare against it.
+  // Intentionally not depending on progressData — we want the value at the moment summary first
+  // appears, before saveProgress updates the store.
+  const previousBest = useMemo(
+    () => (evaluation.summary && currentExercise
+      ? (progress.progressData[currentExercise.id]?.bestScore ?? null)
+      : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [evaluation.summary, currentExercise?.id],
+  );
+
   // Save progress when an evaluation finishes
   useEffect(() => {
     if (currentView === 'trainer' && evaluation.summary && currentExercise) {
-      setPreviousBest(prev => {
-        if (prev === null) {
-          return progress.progressData[currentExercise.id]?.bestScore ?? null;
-        }
-        return prev;
-      });
       const bestScoreBpm = alphaTabRef.current?.getTempo() ?? 0;
       progress.saveProgress({
         exerciseId: currentExercise.id,
@@ -167,10 +169,8 @@ function App() {
         highestBpm: bestScoreBpm,
         lastPlayedAt: new Date().toISOString(),
       });
-    } else {
-      setPreviousBest(null);
     }
-  }, [currentView, evaluation.summary, currentExercise?.id, progress.saveProgress, progress.progressData]);
+  }, [currentView, evaluation.summary, currentExercise, progress]);
 
   // ── Next exercise (if available) ───────────────────
   const currentIndex = currentExercise ? exercises.findIndex((e) => e.id === currentExercise.id) : -1;

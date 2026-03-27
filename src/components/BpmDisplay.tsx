@@ -26,10 +26,7 @@ export default function BpmDisplay({
   const [draft, setDraft] = useState(String(value));
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Keep draft in sync when value changes externally
-  useEffect(() => {
-    if (!editing) setDraft(String(value));
-  }, [value, editing]);
+  const displayValue = editing ? draft : String(value);
 
   // Auto-focus & select when entering edit mode
   useEffect(() => {
@@ -120,7 +117,7 @@ export default function BpmDisplay({
             className="text-3xl font-extrabold tabular-nums tracking-tighter text-foreground hover:text-primary disabled:opacity-40 transition-colors leading-none"
             aria-label={`Current tempo ${value} BPM. Click to edit.`}
           >
-            {value}
+            {displayValue}
           </button>
         )}
         <span className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground leading-none mt-0.5" aria-hidden="true">

@@ -57,6 +57,7 @@ describe('extractTimedNotes', () => {
   const PPQN = 960; // AlphaTab pulses per quarter note
 
   it('returns empty array when score is null', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const api = { score: null, tickCache: null } as any;
     expect(extractTimedNotes(api)).toEqual([]);
   });
@@ -207,6 +208,7 @@ describe('extractTimedNotes', () => {
         ],
       },
       tickCache: { masterBars: [] },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any;
 
     const notes = extractTimedNotes(api);

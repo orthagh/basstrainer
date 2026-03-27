@@ -1,6 +1,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { useEvaluation } from './useEvaluation';
 import type { TimedNote } from '../audio/noteExtractor';
+import type { DetectedNote } from '../audio/audioAnalyser';
 import { vi } from 'vitest';
 
 describe('useEvaluation', () => {
@@ -56,7 +57,7 @@ describe('useEvaluation', () => {
 
   it('processes detected notes and updates live results', () => {
     let isPlaying = false;
-    let lastDetectedNote: any = null;
+    let lastDetectedNote: DetectedNote | null = null;
     const scorePositionRef = { current: 0 };
     
     const { result, rerender } = renderHook(() =>
@@ -79,10 +80,11 @@ describe('useEvaluation', () => {
     act(() => {
       scorePositionRef.current = 1000;
       lastDetectedNote = {
-        frequency: 82.41, // E2, approx midi 40
-        clarity: 0.9,
-        timestamp: 1000,
-        volume: -10,
+        midi: 40,
+        frequency: 82.41, // E2
+        noteName: 'E2',
+        time: 1.0,
+        rms: 0.5,
       };
       rerender();
     });

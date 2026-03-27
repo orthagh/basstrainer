@@ -13,33 +13,7 @@ import {
 } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { SlidersHorizontal } from 'lucide-react';
-
-// ── Stave profile ────────────────────────────────────────────────────────────
-
-export type StaveProfile = 'Default' | 'Score' | 'Tab';
-
-const LS_KEY = 'groovetrainer:staveProfile';
-
-export function loadStaveProfile(): StaveProfile {
-  const v = localStorage.getItem(LS_KEY);
-  if (v === 'Default' || v === 'Score' || v === 'Tab') return v;
-  return 'Default';
-}
-
-/** Derive two independent booleans from the AlphaTab stave profile. */
-export function staveProfileToToggles(p: StaveProfile): { showStandard: boolean; showTab: boolean } {
-  return {
-    showStandard: p === 'Default' || p === 'Score',
-    showTab:      p === 'Default' || p === 'Tab',
-  };
-}
-
-/** Convert two booleans back to a stave profile, ensuring at least one is on. */
-function togglesToStaveProfile(showStandard: boolean, showTab: boolean): StaveProfile {
-  if (showStandard && showTab) return 'Default';
-  if (showStandard) return 'Score';
-  return 'Tab';
-}
+import { staveProfileToToggles, togglesToStaveProfile, STAVE_PROFILE_LS_KEY, type StaveProfile } from '@/lib/displaySettings';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -65,7 +39,7 @@ export default function DisplaySettings({
         if (field === 'showStandard') t = true; else s = true;
       }
       const profile = togglesToStaveProfile(s, t);
-      localStorage.setItem(LS_KEY, profile);
+      localStorage.setItem(STAVE_PROFILE_LS_KEY, profile);
       onChange(profile);
     },
     [showStandard, showTab, onChange],

@@ -13,7 +13,7 @@
  * render cycle).  The ref is kept in sync by assigning in the render body.
  */
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   scheduleClick,
   getSharedAudioContext,
@@ -123,9 +123,10 @@ export function useMetronome(): MetronomeState & {
   const [currentBar, setCurrentBar] = useState(1);
 
   // Always-fresh ref for the scheduler (avoids stale closure over config).
-  // Updated every render so the scheduler always reads the latest values.
   const configRef = useRef(config);
-  configRef.current = config;
+  useLayoutEffect(() => {
+    configRef.current = config;
+  });
 
   // Scheduler position refs — not React state; mutated by the scheduler
   const audioCtxRef = useRef<AudioContext | null>(null);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 
 export interface ProgressRecord {
   exerciseId: string;
@@ -21,18 +21,15 @@ export interface ProgressRecord {
 const STORAGE_KEY = 'groovetrainer:progress';
 
 export function useProgress() {
-  const [progressData, setProgressData] = useState<Record<string, ProgressRecord>>({});
-
-  useEffect(() => {
+  const [progressData, setProgressData] = useState<Record<string, ProgressRecord>>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setProgressData(JSON.parse(stored));
-      }
+      if (stored) return JSON.parse(stored) as Record<string, ProgressRecord>;
     } catch (err) {
       console.error('Failed to parse progress from localStorage', err);
     }
-  }, []);
+    return {};
+  });
 
   const saveProgress = useCallback((newRecord: Omit<ProgressRecord, 'attempts' | 'bestScore' | 'bestTimingScore' | 'bestPitchScore' | 'bestScoreBpm' | 'highestBpm'> & Partial<ProgressRecord>) => {
     setProgressData((prev) => {

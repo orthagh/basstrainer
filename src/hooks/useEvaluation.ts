@@ -88,9 +88,14 @@ export function useEvaluation(
   const [tolerance, setTolerance] = useState<ToleranceSettings>(
     TOLERANCE_PRESETS.medium,
   );
-  const [latencyMs, setLatencyMs] = useState(
-    compensatorRef.current.offsetMs,
-  );
+  const [latencyMs, setLatencyMs] = useState(() => {
+    try {
+      const stored = localStorage.getItem('groovetrainer:latencyOffsetMs');
+      return stored ? Number(stored) : 0;
+    } catch {
+      return 0;
+    }
+  });
   const [isActive, setIsActive] = useState(false);
   const [liveResults, setLiveResults] = useState<LiveResults>({
     hits: 0,
@@ -118,6 +123,7 @@ export function useEvaluation(
         );
         engineRef.current = engine;
         lastProcessedNoteRef.current = null;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSummary(null);
         setLastEvaluation(null);
         setEvaluations([]);
@@ -187,6 +193,7 @@ export function useEvaluation(
   // ── Reset when exercise changes ─────────────────────────
   useEffect(() => {
     engineRef.current = null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsActive(false);
     setLiveResults({ hits: 0, misses: 0, total: 0, accuracy: 0 });
     setLastEvaluation(null);
