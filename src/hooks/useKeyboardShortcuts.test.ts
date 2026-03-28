@@ -13,16 +13,22 @@ function makeActions(overrides: Partial<KeyboardShortcutActions> = {}): Keyboard
     stop: vi.fn(),
     toggleLoop: vi.fn(),
     toggleMetronome: vi.fn(),
+    toggleCountIn: vi.fn(),
+    toggleTracks: vi.fn(),
     toggleFullscreen: vi.fn(),
-    tempoChange: vi.fn(),
+    moveToPreviousBar: vi.fn(),
+    moveToNextBar: vi.fn(),
+    moveToPreviousLine: vi.fn(),
+    moveToNextLine: vi.fn(),
     enabled: true,
     ...overrides,
   };
 }
 
-function fireKey(code: string, target?: HTMLElement) {
+function fireKey(code: string, key?: string, target?: HTMLElement) {
   const event = new KeyboardEvent('keydown', {
     code,
+    key: key ?? code,
     bubbles: true,
     cancelable: true,
   });
@@ -42,64 +48,64 @@ describe('useKeyboardShortcuts', () => {
 
   it('Space triggers playPause', () => {
     renderHook(() => useKeyboardShortcuts(actions));
-    fireKey('Space');
+    fireKey('Space', ' ');
     expect(actions.playPause).toHaveBeenCalledOnce();
   });
 
   it('Escape triggers stop', () => {
     renderHook(() => useKeyboardShortcuts(actions));
-    fireKey('Escape');
+    fireKey('Escape', 'Escape');
     expect(actions.stop).toHaveBeenCalledOnce();
   });
 
   it('KeyL triggers toggleLoop', () => {
     renderHook(() => useKeyboardShortcuts(actions));
-    fireKey('KeyL');
+    fireKey('KeyL', 'l');
     expect(actions.toggleLoop).toHaveBeenCalledOnce();
   });
 
   it('KeyM triggers toggleMetronome', () => {
     renderHook(() => useKeyboardShortcuts(actions));
-    fireKey('KeyM');
+    fireKey('KeyM', 'm');
     expect(actions.toggleMetronome).toHaveBeenCalledOnce();
   });
 
   it('KeyF triggers toggleFullscreen', () => {
     renderHook(() => useKeyboardShortcuts(actions));
-    fireKey('KeyF');
+    fireKey('KeyF', 'f');
     expect(actions.toggleFullscreen).toHaveBeenCalledOnce();
   });
 
-  it('ArrowLeft triggers tempoChange(-5)', () => {
+  it('ArrowLeft triggers moveToPreviousBar', () => {
     renderHook(() => useKeyboardShortcuts(actions));
-    fireKey('ArrowLeft');
-    expect(actions.tempoChange).toHaveBeenCalledWith(-5);
+    fireKey('ArrowLeft', 'ArrowLeft');
+    expect(actions.moveToPreviousBar).toHaveBeenCalledOnce();
   });
 
-  it('ArrowRight triggers tempoChange(+5)', () => {
+  it('ArrowRight triggers moveToNextBar', () => {
     renderHook(() => useKeyboardShortcuts(actions));
-    fireKey('ArrowRight');
-    expect(actions.tempoChange).toHaveBeenCalledWith(5);
+    fireKey('ArrowRight', 'ArrowRight');
+    expect(actions.moveToNextBar).toHaveBeenCalledOnce();
   });
 
-  it('ArrowUp triggers tempoChange(+1)', () => {
+  it('ArrowUp triggers moveToPreviousLine', () => {
     renderHook(() => useKeyboardShortcuts(actions));
-    fireKey('ArrowUp');
-    expect(actions.tempoChange).toHaveBeenCalledWith(1);
+    fireKey('ArrowUp', 'ArrowUp');
+    expect(actions.moveToPreviousLine).toHaveBeenCalledOnce();
   });
 
-  it('ArrowDown triggers tempoChange(-1)', () => {
+  it('ArrowDown triggers moveToNextLine', () => {
     renderHook(() => useKeyboardShortcuts(actions));
-    fireKey('ArrowDown');
-    expect(actions.tempoChange).toHaveBeenCalledWith(-1);
+    fireKey('ArrowDown', 'ArrowDown');
+    expect(actions.moveToNextLine).toHaveBeenCalledOnce();
   });
 
   it('does nothing when disabled', () => {
     actions.enabled = false;
     renderHook(() => useKeyboardShortcuts(actions));
-    fireKey('Space');
-    fireKey('Escape');
-    fireKey('KeyL');
+    fireKey('Space', ' ');
+    fireKey('Escape', 'Escape');
+    fireKey('KeyL', 'l');
     expect(actions.playPause).not.toHaveBeenCalled();
     expect(actions.stop).not.toHaveBeenCalled();
     expect(actions.toggleLoop).not.toHaveBeenCalled();
@@ -113,6 +119,7 @@ describe('useKeyboardShortcuts', () => {
 
     const event = new KeyboardEvent('keydown', {
       code: 'Space',
+      key: ' ',
       bubbles: true,
       cancelable: true,
     });
@@ -130,6 +137,7 @@ describe('useKeyboardShortcuts', () => {
 
     const event = new KeyboardEvent('keydown', {
       code: 'Escape',
+      key: 'Escape',
       bubbles: true,
       cancelable: true,
     });
