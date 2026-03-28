@@ -25,9 +25,8 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { FaMicrophone, FaDrum, FaMusic } from 'react-icons/fa6';
-import { GiGuitar } from 'react-icons/gi';
-import { MdAudiotrack } from 'react-icons/md';
+import { Icon } from '@iconify/react';
+import InstrumentIcon from './InstrumentIcon';
 import type { NoteEvaluation } from '../evaluation/types';
 import NoteEvaluationOverlay, { type BeatRect } from './NoteEvaluationOverlay';
 
@@ -91,30 +90,6 @@ function getTrackLabel(track: AlphaTabTrack): string {
   return `Track ${track.index + 1}`;
 }
 
-function getInstrumentIcon(track: AlphaTabTrack): React.ReactNode {
-  const label = getTrackLabel(track).toLowerCase();
-
-  if (/vocal|voice|lead|singer/i.test(label)) {
-    return <FaMicrophone size={18} aria-hidden="true" />;
-  }
-  if (/bass/i.test(label)) {
-    return <MdAudiotrack size={18} aria-hidden="true" />;
-  }
-  if (/drum|percussion|kit|kick|snare|hi.?hat/i.test(label)) {
-    return <FaDrum size={18} aria-hidden="true" />;
-  }
-  if (/piano|keys|keyboard/i.test(label)) {
-    return <FaMusic size={18} aria-hidden="true" />;
-  }
-  if (/guitar|gtr|lead|rhythm|acoustic|electric/i.test(label)) {
-    return <GiGuitar size={18} aria-hidden="true" />;
-  }
-  if (/synth|pad|arp|effect|string/i.test(label)) {
-    return <FaMusic size={18} aria-hidden="true" />;
-  }
-
-  return <FaMusic size={18} aria-hidden="true" />;
-}
 
 function getDefaultSelectedTrackIndex(tracks: AlphaTabTrack[]): number | null {
   if (tracks.length === 0) {
@@ -1172,8 +1147,8 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
               aria-label="Track selection and mixer"
               aria-expanded={isTracksPanelOpen}
             >
-              <span className="h-5 w-5 inline-flex items-center justify-center shrink-0 opacity-80">
-                {getInstrumentIcon(availableTracks.find((t) => t.index === selectedTrackIndex) ?? availableTracks[0])}
+              <span className="h-6 w-6 inline-flex items-center justify-center shrink-0 opacity-80">
+                <InstrumentIcon label={getTrackLabel(availableTracks.find((t) => t.index === selectedTrackIndex) ?? availableTracks[0])} size={22} />
               </span>
               <span className="text-sm font-medium truncate max-w-32">
                 {selectedTrackIndex === null
@@ -1429,7 +1404,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
         {/* Sliding tracks panel */}
         {availableTracks.length > 1 && (
           <div
-            className={`shrink-0 overflow-hidden border-r border-border bg-card transition-[width] duration-200 ease-in-out relative z-10 ${isTracksPanelOpen ? 'w-72' : 'w-0'}`}
+            className={`shrink-0 overflow-hidden border-r border-border bg-secondary transition-[width] duration-200 ease-in-out relative z-10 ${isTracksPanelOpen ? 'w-72' : 'w-0'}`}
           >
             <div className="w-72 h-full overflow-y-auto">
               <div className="divide-y divide-border">
@@ -1441,8 +1416,8 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
                   return (
                     <div
                       key={`track-${track.index}`}
-                      className={`flex items-center gap-1.5 px-2 py-3.5 cursor-pointer select-none transition-colors ${
-                        isSelected ? 'bg-primary/10' : 'hover:bg-secondary/50'
+                      className={`flex items-stretch gap-3 px-3 py-3 cursor-pointer select-none transition-colors ${
+                        isSelected ? 'bg-primary/10' : 'hover:bg-muted/60'
                       }`}
                       role="button"
                       tabIndex={0}
@@ -1456,53 +1431,63 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
                       aria-label={isSelected ? `${getTrackLabel(track)} is active for notation` : `Set ${getTrackLabel(track)} as the active notation track`}
                       aria-pressed={isSelected}
                     >
-                      {/* Icon */}
-                      <span className={`h-5 w-5 shrink-0 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
-                        {getInstrumentIcon(track)}
+                      {/* Icon — full height, centered */}
+                      <span className={`flex items-center justify-center shrink-0 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
+                        <InstrumentIcon label={getTrackLabel(track)} size={24} />
                       </span>
 
-                      {/* Name */}
-                      <span className={`flex-1 text-xs font-medium truncate ${isSelected ? 'text-primary' : 'text-foreground'}`}>
-                        {getTrackLabel(track)}
-                      </span>
+                      {/* Right column: title top, controls bottom */}
+                      <div className="flex flex-col flex-1 min-w-0 gap-2.5">
+                        {/* Track name */}
+                        <span className={`text-xs font-semibold truncate leading-none ${isSelected ? 'text-primary' : 'text-foreground'}`}>
+                          {getTrackLabel(track)}
+                        </span>
 
-                      {/* Volume slider */}
-                      <div
-                        className="w-16 shrink-0"
-                        onClick={(e) => e.stopPropagation()}
-                        onPointerDown={(e) => e.stopPropagation()}
-                      >
-                        <Slider
-                          min={0}
-                          max={150}
-                          step={5}
-                          value={[volumePercent]}
-                          onValueChange={([value]) => setTrackVolume(track.index, value)}
-                          aria-label={`Volume for ${getTrackLabel(track)}`}
-                          className={`[&_[role=slider]]:h-2.5 [&_[role=slider]]:w-2.5 [&_[data-slot=slider-range]]:bg-muted-foreground/40 [&_[data-slot=slider-thumb]]:border-muted-foreground/40 [&_[data-slot=slider-thumb]]:bg-background hover:[&_[data-slot=slider-range]]:bg-primary hover:[&_[data-slot=slider-thumb]]:border-primary ${activeVolumeTrackIndex === track.index ? '[&_[data-slot=slider-range]]:bg-primary [&_[data-slot=slider-thumb]]:border-primary' : ''}`}
-                        />
-                      </div>
+                        {/* Bottom row: volume left, M/S right */}
+                        <div className="flex items-center gap-2">
+                          {/* Volume slider — 50% width */}
+                          <div
+                            className="w-1/2 shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                          >
+                            <Slider
+                              min={0}
+                              max={150}
+                              step={5}
+                              value={[volumePercent]}
+                              onValueChange={([value]) => setTrackVolume(track.index, value)}
+                              aria-label={`Volume for ${getTrackLabel(track)}`}
+                              className={`[&_[role=slider]]:h-2.5 [&_[role=slider]]:w-2.5 [&_[data-slot=slider-track]]:bg-muted-foreground/20 [&_[data-slot=slider-range]]:bg-muted-foreground/40 [&_[data-slot=slider-thumb]]:border-muted-foreground/40 [&_[data-slot=slider-thumb]]:bg-card hover:[&_[data-slot=slider-range]]:bg-primary hover:[&_[data-slot=slider-thumb]]:border-primary ${activeVolumeTrackIndex === track.index ? '[&_[data-slot=slider-range]]:bg-primary [&_[data-slot=slider-thumb]]:border-primary' : ''}`}
+                            />
+                          </div>
 
-                      {/* M/S buttons — clicking selects track (via row), buttons act on their own */}
-                      <div className="flex gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => toggleTrackMute(track.index)}
-                          className={`h-5 w-5 rounded text-[10px] font-semibold inline-flex items-center justify-center transition-colors ${
-                            isMutedTrack ? 'bg-destructive/10 text-destructive' : 'bg-secondary text-muted-foreground hover:text-foreground'
-                          }`}
-                          aria-label={isMutedTrack ? `Unmute ${getTrackLabel(track)}` : `Mute ${getTrackLabel(track)}`}
-                          aria-pressed={isMutedTrack}
-                          title={isMutedTrack ? 'Unmute' : 'Mute'}
-                        >M</button>
-                        <button
-                          onClick={() => toggleTrackSolo(track.index)}
-                          className={`h-5 w-5 rounded text-[10px] font-semibold inline-flex items-center justify-center transition-colors ${
-                            isSoloTrack ? 'bg-amber-500/15 text-amber-600' : 'bg-secondary text-muted-foreground hover:text-foreground'
-                          }`}
-                          aria-label={isSoloTrack ? `Disable solo for ${getTrackLabel(track)}` : `Solo ${getTrackLabel(track)}`}
-                          aria-pressed={isSoloTrack}
-                          title={isSoloTrack ? 'Disable solo' : 'Solo'}
-                        >S</button>
+                          {/* Mute/Solo buttons */}
+                          <div className="flex gap-0.5 shrink-0 ml-auto" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => toggleTrackMute(track.index)}
+                              className={`h-6 w-6 rounded inline-flex items-center justify-center transition-colors ${
+                                isMutedTrack ? 'bg-destructive/10 text-destructive' : 'bg-white text-muted-foreground hover:text-foreground'
+                              }`}
+                              aria-label={isMutedTrack ? `Unmute ${getTrackLabel(track)}` : `Mute ${getTrackLabel(track)}`}
+                              aria-pressed={isMutedTrack}
+                              title={isMutedTrack ? 'Unmute' : 'Mute'}
+                            >
+                              <Icon icon="qlementine-icons:speaker-mute-16" width={14} height={14} aria-hidden="true" />
+                            </button>
+                            <button
+                              onClick={() => toggleTrackSolo(track.index)}
+                              className={`h-6 w-6 rounded inline-flex items-center justify-center transition-colors ${
+                                isSoloTrack ? 'bg-yellow-400 text-yellow-900' : 'bg-white text-muted-foreground hover:text-foreground'
+                              }`}
+                              aria-label={isSoloTrack ? `Disable solo for ${getTrackLabel(track)}` : `Solo ${getTrackLabel(track)}`}
+                              aria-pressed={isSoloTrack}
+                              title={isSoloTrack ? 'Disable solo' : 'Solo'}
+                            >
+                              <Icon icon="qlementine-icons:headphones-16" width={14} height={14} aria-hidden="true" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );
