@@ -1,6 +1,6 @@
-# Bass Groove Trainer
+# Bass Trainer
 
-![Bass Groove Trainer](screenshot.png)
+![Bass Trainer](screenshot.png)
 
 **This is a personal project built for my own bass practice. It is not designed as a general-purpose tool and may not be useful or usable for anyone else.**
 
