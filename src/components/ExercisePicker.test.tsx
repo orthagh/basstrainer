@@ -93,7 +93,7 @@ describe('ExercisePicker', () => {
     );
 
     const currentButton = screen.getByText('Root Notes').closest('button')!;
-    expect(currentButton.className).toContain('bg-primary');
+    expect(currentButton.className).toContain('bg-white/15');
   });
 
   it('non-current exercises are not highlighted', () => {
