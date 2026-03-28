@@ -230,12 +230,12 @@ function App() {
     <TooltipProvider>
       <div ref={mainRef} className="h-screen bg-background flex flex-col overflow-hidden">
         {/* Header with Navigation */}
-        <header className="bg-card border-b border-border py-4 px-6 flex items-center justify-between relative z-10">
+        <header className="bg-zinc-700 border-b border-border py-4 px-6 flex items-center justify-between relative z-10">
           <div className="flex items-center gap-3 flex-1">
             <div className="bg-primary text-primary-foreground p-2 rounded-lg">
               <Activity size={24} />
             </div>
-            <h1 className="text-xl font-bold text-foreground tracking-tight">
+            <h1 className="text-xl font-bold text-zinc-100 tracking-tight">
               Bass Trainer
             </h1>
           </div>
@@ -246,8 +246,8 @@ function App() {
               onClick={() => navigateTo('directory')}
               className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors ${
                 currentView === 'directory'
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  ? 'bg-white/15 text-zinc-100'
+                  : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/10'
               }`}
               title="Exercise Directory"
             >
@@ -258,8 +258,8 @@ function App() {
               onClick={() => navigateTo('trainer')}
               className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors ${
                 currentView === 'trainer'
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  ? 'bg-white/15 text-zinc-100'
+                  : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/10'
               }`}
               title="Groove Trainer"
             >
@@ -270,8 +270,8 @@ function App() {
               onClick={() => navigateTo('tuner')}
               className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors ${
                 currentView === 'tuner'
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  ? 'bg-white/15 text-zinc-100'
+                  : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/10'
               }`}
               title="Bass Tuner"
             >
@@ -282,8 +282,8 @@ function App() {
               onClick={() => navigateTo('metronome')}
               className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors ${
                 currentView === 'metronome'
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  ? 'bg-white/15 text-zinc-100'
+                  : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/10'
               }`}
               title="Metronome"
             >
@@ -295,7 +295,7 @@ function App() {
           <div className="flex items-center gap-1 flex-1 justify-end">
             <button
               onClick={() => setShowWelcome(true)}
-              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors hidden sm:block"
+              className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-white/10 rounded-full transition-colors hidden sm:block"
               title="About Bass Trainer"
             >
               <Info size={20} />
@@ -303,7 +303,7 @@ function App() {
             <Popover>
               <PopoverTrigger asChild>
                 <button
-                  className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors"
+                  className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-white/10 rounded-full transition-colors"
                   title="Keyboard shortcuts"
                 >
                   <Keyboard size={20} />
@@ -335,7 +335,7 @@ function App() {
             </Popover>
             <button
               onClick={toggleFullscreen}
-              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors"
+              className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-white/10 rounded-full transition-colors"
               title={isFullscreen ? 'Exit fullscreen (F)' : 'Fullscreen (F)'}
             >
               {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
@@ -355,12 +355,12 @@ function App() {
                     onClick={() => setSidebarOpen(false)}
                     aria-hidden="true"
                   />
-                  <aside className="w-full sm:w-72 shrink-0 bg-card border-r border-border flex flex-col overflow-hidden absolute inset-0 z-40 sm:relative sm:inset-auto shadow-2xl sm:shadow-none animate-in slide-in-from-left duration-200">
-                    <div className="flex items-center justify-between px-3 pt-3 pb-2 shrink-0 border-b border-border/50 sm:border-none">
-                      <h3 className="font-semibold text-foreground text-sm">Directory</h3>
+                  <aside className="w-full sm:w-72 shrink-0 bg-zinc-700 border-r border-border flex flex-col overflow-hidden absolute inset-0 z-40 sm:relative sm:inset-auto shadow-2xl sm:shadow-none animate-in slide-in-from-left duration-200">
+                    <div className="flex items-center justify-between px-3 pt-3 pb-2 shrink-0 border-b border-white/10 sm:border-none">
+                      <h3 className="font-semibold text-zinc-200 text-sm">Directory</h3>
                       <button
                         onClick={() => setSidebarOpen(false)}
-                        className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                        className="p-1 text-zinc-400 hover:text-zinc-100 hover:bg-white/10 rounded transition-colors"
                         title="Collapse sidebar"
                       >
                         <PanelLeftClose size={16} />
@@ -393,6 +393,7 @@ function App() {
                     ref={alphaTabRef}
                     key={directoryExercise.id}
                     exercise={directoryExercise}
+                    sidebarWidth={sidebarOpen ? 288 : 52}
                     metronomeConfig={metronomeConfig}
                     onMetronomeConfigChange={setMetronomeConfig}
                     onNoteDataExtracted={(notes) => setNoteData(notes)}
@@ -434,9 +435,9 @@ function App() {
                     onClick={() => setSidebarOpen(false)}
                     aria-hidden="true"
                   />
-                  <aside className="w-full sm:w-64 shrink-0 bg-card border-r border-border flex flex-col overflow-hidden absolute inset-0 z-40 sm:relative sm:inset-auto shadow-2xl sm:shadow-none animate-in slide-in-from-left duration-200">
-                    <div className="flex items-center justify-between px-3 pt-3 pb-2 shrink-0 border-b border-border/50 sm:border-none">
-                      <h3 className="font-semibold text-foreground text-sm">Exercises</h3>
+                  <aside className="w-full sm:w-64 shrink-0 bg-zinc-700 border-r border-border flex flex-col overflow-hidden absolute inset-0 z-40 sm:relative sm:inset-auto shadow-2xl sm:shadow-none animate-in slide-in-from-left duration-200">
+                    <div className="flex items-center justify-between px-3 pt-3 pb-2 shrink-0 border-b border-white/10 sm:border-none">
+                      <h3 className="font-semibold text-zinc-200 text-sm">Exercises</h3>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => {
@@ -444,14 +445,14 @@ function App() {
                               progress.clearProgress();
                             }
                           }}
-                          className="p-1 text-muted-foreground hover:text-rose-400 hover:bg-muted rounded transition-colors"
+                          className="p-1 text-zinc-400 hover:text-rose-400 hover:bg-white/10 rounded transition-colors"
                           title="Reset all progress"
                         >
                           <RotateCcw size={16} />
                         </button>
                         <button
                           onClick={() => setSidebarOpen(false)}
-                          className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                          className="p-1 text-zinc-400 hover:text-zinc-100 hover:bg-white/10 rounded transition-colors"
                           title="Collapse sidebar"
                         >
                           <PanelLeftClose size={16} />
@@ -485,6 +486,7 @@ function App() {
                     ref={alphaTabRef}
                     key={currentExercise.id}
                     exercise={currentExercise}
+                    sidebarWidth={sidebarOpen ? 256 : 52}
                     metronomeConfig={metronomeConfig}
                     onMetronomeConfigChange={setMetronomeConfig}
                     onNoteDataExtracted={(notes) => setNoteData(notes)}

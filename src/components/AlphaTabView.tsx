@@ -121,6 +121,7 @@ export interface AlphaTabHandle {
 
 interface AlphaTabViewProps {
   exercise: Exercise;
+  sidebarWidth?: number;
   onReady?: () => void;
   onTempoChange?: (tempo: number) => void;
   onNoteDataExtracted?: (notes: TimedNote[]) => void;
@@ -140,6 +141,7 @@ interface AlphaTabViewProps {
 
 const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function AlphaTabView({
   exercise,
+  sidebarWidth = 0,
   onReady,
   onNoteDataExtracted,
   onPlayStateChange,
@@ -466,6 +468,12 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exercise.id]);
+
+  // Re-render after sidebar transition completes so AlphaTab lays out at the correct width
+  useEffect(() => {
+    const id = setTimeout(() => apiRef.current?.render(), 220);
+    return () => clearTimeout(id);
+  }, [sidebarWidth]);
 
   useEffect(() => {
     const api = apiRef.current;
@@ -1166,7 +1174,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
 
 
         {/* ── Center: Return to start + Play/Pause ── */}
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-center" style={{ transform: `translateX(${-sidebarWidth / 2}px)` }}>
           {/* Return to start — outlined, left-rounded, right edge hidden behind play button */}
           <button
             onClick={stop}
@@ -1399,7 +1407,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
       </div>
 
       {/* Content row: sliding tracks panel + viewport */}
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 min-w-0">
 
         {/* Sliding tracks panel */}
         {availableTracks.length > 1 && (
@@ -1498,30 +1506,18 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
         )}
 
         {/* Right side: viewport + progress bar */}
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col min-h-0 min-w-0">
 
-        {/* AlphaTab rendering viewport */}
-        <div
-          ref={viewportRef}
-          className="flex-1 overflow-y-auto relative isolate scrollbar-autohide"
-        >
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-card/80 z-10">
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm text-muted-foreground">Loading…</p>
-            </div>
-          </div>
-        )}
-
-        {/* Custom score header: tuning left, title+artist centered */}
+        {/* Custom score header — outside scroll area so translateX doesn't affect AlphaTab resize */}
         {scoreInfo && (scoreInfo.title || scoreInfo.artist) && (() => {
           const tuningNotes = selectedTrackIndex !== null
             ? (scoreInfo.tunings.get(selectedTrackIndex) ?? null)
             : null;
           return (
-            <div className="flex flex-col items-center px-6 pt-6 pb-4 gap-1">
-              {/* Title + artist */}
+            <div
+              className="flex flex-col items-center px-6 pt-6 pb-4 gap-1 shrink-0"
+              style={{ transform: `translateX(${-sidebarWidth / 2}px)` }}
+            >
               <div className="text-center">
                 {scoreInfo.title && (
                   <h2 className="text-lg font-bold text-foreground leading-tight">{scoreInfo.title}</h2>
@@ -1530,7 +1526,6 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
                   <p className="text-sm text-muted-foreground mt-0.5">{scoreInfo.artist}</p>
                 )}
               </div>
-              {/* Tuning row — strings left (high) to right (low) */}
               {tuningNotes && (
                 <div className="flex items-center gap-1.5">
                   {[...tuningNotes].reverse().map((note, i) => (
@@ -1543,6 +1538,20 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
             </div>
           );
         })()}
+
+        {/* AlphaTab rendering viewport */}
+        <div
+          ref={viewportRef}
+          className="flex-1 overflow-y-auto min-w-0 relative isolate scrollbar-autohide"
+        >
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-card/80 z-10">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            </div>
+          </div>
+        )}
 
         <div
           className={`relative ${isLooping ? 'cursor-ew-resize' : ''}`}
