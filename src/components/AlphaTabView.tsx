@@ -137,6 +137,11 @@ export interface AlphaTabHandle {
   toggleLoop: () => void;
   changeTempo: (delta: number) => void;
   getTempo: () => number;
+  moveToPreviousBar: () => void;
+  moveToNextBar: () => void;
+  moveToPreviousLine: () => void;
+  moveToNextLine: () => void;
+  toggleTracks: () => void;
 }
 
 interface AlphaTabViewProps {
@@ -844,6 +849,86 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     viewportRef.current?.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
   }, []);
 
+  // ── Bar / line navigation ────────────────────────
+  const moveToPreviousBar = useCallback(() => {
+    const api = apiRef.current;
+    if (!api?.tickCache) return;
+    const bars = api.tickCache.masterBars;
+    if (bars.length === 0) return;
+    const cur = api.tickPosition;
+    let currentIdx = 0;
+    for (let i = 0; i < bars.length; i++) {
+      if (bars[i].start <= cur) currentIdx = i;
+      else break;
+    }
+    api.tickPosition = bars[Math.max(0, currentIdx - 1)].start;
+  }, []);
+
+  const moveToNextBar = useCallback(() => {
+    const api = apiRef.current;
+    if (!api?.tickCache) return;
+    const bars = api.tickCache.masterBars;
+    if (bars.length === 0) return;
+    const cur = api.tickPosition;
+    let currentIdx = 0;
+    for (let i = 0; i < bars.length; i++) {
+      if (bars[i].start <= cur) currentIdx = i;
+      else break;
+    }
+    api.tickPosition = bars[Math.min(bars.length - 1, currentIdx + 1)].start;
+  }, []);
+
+  const getLineStartTicks = useCallback((): number[] => {
+    const api = apiRef.current;
+    if (!api?.tickCache || !api.renderer?.boundsLookup) return [];
+    const masterBars = api.tickCache.masterBars;
+    const ticks: number[] = [];
+    for (const system of api.renderer.boundsLookup.staffSystems) {
+      if (system.bars.length > 0) {
+        // MasterBarBounds.index is the master bar index
+        const mbIdx = system.bars[0].index;
+        if (mbIdx >= 0 && mbIdx < masterBars.length) {
+          ticks.push(masterBars[mbIdx].start);
+        }
+      }
+    }
+    return ticks;
+  }, []);
+
+  const moveToPreviousLine = useCallback(() => {
+    const api = apiRef.current;
+    if (!api) return;
+    const lineTicks = getLineStartTicks();
+    if (lineTicks.length === 0) return;
+    const cur = api.tickPosition;
+    let currentLineIdx = 0;
+    for (let i = 0; i < lineTicks.length; i++) {
+      if (lineTicks[i] <= cur) currentLineIdx = i;
+      else break;
+    }
+    api.tickPosition = lineTicks[Math.max(0, currentLineIdx - 1)];
+  }, [getLineStartTicks]);
+
+  const moveToNextLine = useCallback(() => {
+    const api = apiRef.current;
+    if (!api) return;
+    const lineTicks = getLineStartTicks();
+    if (lineTicks.length === 0) return;
+    const cur = api.tickPosition;
+    let currentLineIdx = 0;
+    for (let i = 0; i < lineTicks.length; i++) {
+      if (lineTicks[i] <= cur) currentLineIdx = i;
+      else break;
+    }
+    api.tickPosition = lineTicks[Math.min(lineTicks.length - 1, currentLineIdx + 1)];
+  }, [getLineStartTicks]);
+
+  const toggleTracks = useCallback(() => {
+    if (availableTracks.length > 1) {
+      setIsTracksPanelOpen((v) => !v);
+    }
+  }, [availableTracks.length]);
+
   // Tempo (playback speed multiplier)
   const changeSpeed = useCallback(
     (newTempo: number) => {
@@ -1056,7 +1141,12 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
       changeSpeed(clamped);
     },
     getTempo: () => tempo,
-  }), [playPause, stop, toggleLoop, tempo, changeSpeed]);
+    moveToPreviousBar,
+    moveToNextBar,
+    moveToPreviousLine,
+    moveToNextLine,
+    toggleTracks,
+  }), [playPause, stop, toggleLoop, tempo, changeSpeed, moveToPreviousBar, moveToNextBar, moveToPreviousLine, moveToNextLine, toggleTracks]);
 
   // ── Time formatting helper ─────────────────────
   const fmt = (ms: number) => {

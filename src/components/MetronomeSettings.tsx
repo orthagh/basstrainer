@@ -74,10 +74,16 @@ export default function MetronomeSettings({
         <button
           disabled={disabled}
           onClick={() => update({ enabled: !active })}
-          className="h-full flex items-center px-2 transition-colors disabled:opacity-40 hover:bg-black/5 dark:hover:bg-white/10 rounded-l-lg"
-          title={active ? 'Disable metronome' : 'Enable metronome'}
+          className="h-full flex items-center gap-1 px-2 transition-colors disabled:opacity-40 hover:bg-black/5 dark:hover:bg-white/10 rounded-l-lg"
+          title={active ? 'Disable metronome (M)' : 'Enable metronome (M)'}
         >
           <MetronomeIcon size={18} />
+          {/* Count-in badge — always visible when count-in is active */}
+          {config.countInBars > 0 && (
+            <span className="text-[10px] font-bold leading-none tabular-nums">
+              +{config.countInBars}
+            </span>
+          )}
         </button>
 
         {/* Separator — only visible when active */}
@@ -88,7 +94,7 @@ export default function MetronomeSettings({
           <button
             disabled={disabled}
             className="h-full flex items-center px-1.5 transition-colors disabled:opacity-40 hover:bg-black/5 dark:hover:bg-white/10 rounded-r-lg"
-            title="Metronome settings"
+            title="Metronome settings (C to toggle count-in)"
           >
             <ChevronDown size={12} className="opacity-60" />
           </button>

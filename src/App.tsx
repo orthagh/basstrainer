@@ -204,11 +204,14 @@ function App() {
     toggleLoop: () => alphaTabRef.current?.toggleLoop(),
     toggleMetronome: () =>
       setMetronomeConfig((c) => ({ ...c, enabled: !c.enabled })),
+    toggleCountIn: () =>
+      setMetronomeConfig((c) => ({ ...c, countInBars: c.countInBars > 0 ? 0 : 1 })),
+    toggleTracks: () => alphaTabRef.current?.toggleTracks(),
     toggleFullscreen,
-    tempoChange: (delta) =>
-      currentView === 'metronome'
-        ? metronomeRef.current?.changeTempo(delta)
-        : alphaTabRef.current?.changeTempo(delta),
+    moveToPreviousBar: () => alphaTabRef.current?.moveToPreviousBar(),
+    moveToNextBar: () => alphaTabRef.current?.moveToNextBar(),
+    moveToPreviousLine: () => alphaTabRef.current?.moveToPreviousLine(),
+    moveToNextLine: () => alphaTabRef.current?.moveToNextLine(),
   });
 
   // ── Welcome Modal ────────────────────────────
@@ -309,12 +312,14 @@ function App() {
                 <div className="space-y-2 text-xs">
                   {[
                     ['Space', 'Play / Pause'],
-                    ['Escape', 'Stop'],
+                    ['Escape / Home', 'Return to start'],
+                    ['← / →', 'Previous / Next bar'],
+                    ['↑ / ↓', 'Previous / Next line'],
                     ['L', 'Toggle loop'],
                     ['M', 'Toggle metronome'],
+                    ['C', 'Toggle count-in'],
+                    ['T', 'Tracks / Mixer'],
                     ['F', 'Fullscreen'],
-                    ['← / →', 'Tempo ±5 BPM'],
-                    ['↑ / ↓', 'Tempo ±1 BPM'],
                   ].map(([key, desc]) => (
                     <div key={key} className="flex items-center justify-between gap-2">
                       <span className="text-muted-foreground">{desc}</span>

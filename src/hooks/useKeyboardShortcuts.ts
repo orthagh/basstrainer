@@ -1,15 +1,21 @@
 /**
  * useKeyboardShortcuts — global keyboard shortcuts for the practice app.
  *
+ * Non-printable keys use e.code (layout-independent physical position).
+ * Letter shortcuts use e.key (layout-aware character), so they work on
+ * AZERTY, QWERTZ, Dvorak, etc.
+ *
  * Shortcuts:
  *   Space      → Play / Pause
  *   Escape     → Stop
+ *   Home       → Return to start
+ *   ←  / →    → Previous / Next bar
+ *   ↑  / ↓    → Previous / Next line
  *   L          → Toggle loop
  *   M          → Toggle metronome
+ *   C          → Toggle count-in
+ *   T          → Toggle tracks/mixer
  *   F          → Toggle fullscreen
- *   ← / →     → Decrease / Increase tempo by 5
- *   ↑ / ↓     → Decrease / Increase tempo by 1
- *   ?          → Show shortcut help (future)
  */
 
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
@@ -19,8 +25,13 @@ export interface KeyboardShortcutActions {
   stop: () => void;
   toggleLoop: () => void;
   toggleMetronome: () => void;
+  toggleCountIn: () => void;
+  toggleTracks: () => void;
   toggleFullscreen: () => void;
-  tempoChange: (delta: number) => void;
+  moveToPreviousBar: () => void;
+  moveToNextBar: () => void;
+  moveToPreviousLine: () => void;
+  moveToNextLine: () => void;
   /** When true, shortcuts are active (player is ready). */
   enabled: boolean;
 }
@@ -31,50 +42,57 @@ export function useKeyboardShortcuts(actions: KeyboardShortcutActions) {
   const handler = useCallback((e: KeyboardEvent) => {
     if (!actions.enabled) return;
 
-    if (
-      e.code === 'Space' ||
-      e.code === 'ArrowLeft' ||
-      e.code === 'ArrowRight' ||
-      e.code === 'ArrowUp' ||
-      e.code === 'ArrowDown'
-    ) {
-      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      const editable = (e.target as HTMLElement)?.isContentEditable;
-      if (tag === 'input' || tag === 'textarea' || tag === 'select' || editable) return;
-      e.preventDefault();
-    }
-
     const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
     const editable = (e.target as HTMLElement)?.isContentEditable;
     if (tag === 'input' || tag === 'textarea' || tag === 'select' || editable) return;
 
+    // Arrow keys and special keys: use e.code (layout-independent physical position)
     switch (e.code) {
       case 'Space':
+        e.preventDefault();
         actions.playPause();
-        break;
+        return;
       case 'Escape':
         actions.stop();
-        break;
-      case 'KeyL':
+        return;
+      case 'Home':
+        e.preventDefault();
+        actions.stop();
+        return;
+      case 'ArrowLeft':
+        e.preventDefault();
+        actions.moveToPreviousBar();
+        return;
+      case 'ArrowRight':
+        e.preventDefault();
+        actions.moveToNextBar();
+        return;
+      case 'ArrowUp':
+        e.preventDefault();
+        actions.moveToPreviousLine();
+        return;
+      case 'ArrowDown':
+        e.preventDefault();
+        actions.moveToNextLine();
+        return;
+    }
+
+    // Letter shortcuts: use e.key (layout-aware, works on AZERTY/QWERTZ/etc.)
+    switch (e.key.toLowerCase()) {
+      case 'l':
         actions.toggleLoop();
         break;
-      case 'KeyM':
+      case 'm':
         actions.toggleMetronome();
         break;
-      case 'KeyF':
+      case 'c':
+        actions.toggleCountIn();
+        break;
+      case 't':
+        actions.toggleTracks();
+        break;
+      case 'f':
         actions.toggleFullscreen();
-        break;
-      case 'ArrowLeft':
-        actions.tempoChange(-5);
-        break;
-      case 'ArrowRight':
-        actions.tempoChange(5);
-        break;
-      case 'ArrowDown':
-        actions.tempoChange(-1);
-        break;
-      case 'ArrowUp':
-        actions.tempoChange(1);
         break;
     }
   }, [actions]);
