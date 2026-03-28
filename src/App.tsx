@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Keyboard, RotateCcw, Info, AudioLines, FolderTree } from 'lucide-react';
 import MetronomeIcon from './components/MetronomeIcon';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { PortalContainerContext } from '@/components/ui/portal-container';
 import {
   Popover,
   PopoverContent,
@@ -225,6 +226,7 @@ function App() {
   }, []);
 
   return (
+    <PortalContainerContext.Provider value={isFullscreen ? mainRef.current : null}>
     <TooltipProvider>
       <div ref={mainRef} className="h-screen bg-background flex flex-col overflow-hidden">
         {/* Header with Navigation */}
@@ -552,6 +554,7 @@ function App() {
         <WelcomeModal isOpen={showWelcome} onClose={handleCloseWelcome} />
       </div>
     </TooltipProvider>
+    </PortalContainerContext.Provider>
   );
 }
 
