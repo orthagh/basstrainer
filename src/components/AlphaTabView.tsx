@@ -1194,7 +1194,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
             <button
               onClick={playPause}
               disabled={!playerReady}
-              className="absolute top-1/2 -translate-y-1/2 bg-primary hover:bg-primary/80 disabled:bg-muted text-primary-foreground w-[4.5rem] h-[4.5rem] rounded-full transition-all flex items-center justify-center z-20 shadow-md"
+              className="absolute top-1/2 -translate-y-1/2 bg-primary hover:brightness-110 disabled:bg-muted text-primary-foreground w-[4.5rem] h-[4.5rem] rounded-full transition-all flex items-center justify-center z-20 shadow-md"
               title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
               aria-label={isPlaying ? 'Pause' : 'Play'}
               aria-pressed={isPlaying}
