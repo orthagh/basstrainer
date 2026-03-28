@@ -47,7 +47,7 @@ export default function InstrumentIcon({ label, size = 18, className }: Instrume
   );
 }
 
-export function getIconTypeFromLabel(label: string): InstrumentType {
+function getIconTypeFromLabel(label: string): InstrumentType {
   const l = label.toLowerCase();
 
   if (/vocal|voice|singer/i.test(l)) return 'vocals';
