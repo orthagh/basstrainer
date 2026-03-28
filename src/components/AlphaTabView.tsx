@@ -1516,7 +1516,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
           return (
             <div
               className="flex flex-col items-center px-6 pt-6 pb-4 gap-1 shrink-0"
-              style={{ transform: `translateX(${-sidebarWidth / 2}px)` }}
+              style={{ transform: `translateX(${-(sidebarWidth + (isTracksPanelOpen ? 288 : 0)) / 2}px)`, transition: 'transform 200ms ease-in-out' }}
             >
               <div className="text-center">
                 {scoreInfo.title && (
