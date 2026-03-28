@@ -31,6 +31,7 @@ type AppView = 'directory' | 'trainer' | 'tuner' | 'metronome';
 
 const VIEWS: AppView[] = ['directory', 'trainer', 'tuner', 'metronome'];
 const LAST_TRAINER_EXERCISE_KEY = 'groovetrainer:lastOpenedTrainerExerciseId';
+const METRONOME_CONFIG_LS_KEY = 'groovetrainer:metronomeConfig';
 
 function viewFromHash(): AppView {
   const hash = window.location.hash.replace(/^#\/?/, '');
@@ -79,13 +80,17 @@ function App() {
   }, [currentExercise]);
 
   // Metronome config — lifted here so evaluation can read count-in state
-  const [metronomeConfig, setMetronomeConfig] = useState<MetronomeConfig>({
-    enabled: true,
-    countInBars: 1,
-    clickSound: 'default',
-    accentFirstBeat: true,
-    volume: 1,
+  const [metronomeConfig, setMetronomeConfig] = useState<MetronomeConfig>(() => {
+    try {
+      const saved = localStorage.getItem(METRONOME_CONFIG_LS_KEY);
+      if (saved) return { ...JSON.parse(saved) };
+    } catch { /* ignore */ }
+    return { enabled: false, countInBars: 0, clickSound: 'default', accentFirstBeat: true, volume: 1 };
   });
+
+  useEffect(() => {
+    localStorage.setItem(METRONOME_CONFIG_LS_KEY, JSON.stringify(metronomeConfig));
+  }, [metronomeConfig]);
 
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
