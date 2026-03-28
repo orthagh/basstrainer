@@ -234,7 +234,7 @@ function App() {
               <Activity size={24} />
             </div>
             <h1 className="text-xl font-bold text-foreground tracking-tight">
-              Bass Groove Trainer
+              Bass Trainer
             </h1>
           </div>
 
@@ -294,7 +294,7 @@ function App() {
             <button
               onClick={() => setShowWelcome(true)}
               className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors hidden sm:block"
-              title="About Bass Groove Trainer"
+              title="About Bass Trainer"
             >
               <Info size={20} />
             </button>
@@ -502,7 +502,7 @@ function App() {
                     <div className="bg-muted p-6 rounded-full mb-6">
                       <Activity size={48} className="text-primary/50" />
                     </div>
-                    <h2 className="text-2xl font-semibold text-foreground mb-3">Welcome to Bass Groove Trainer</h2>
+                    <h2 className="text-2xl font-semibold text-foreground mb-3">Welcome to Bass Trainer</h2>
                     <p className="max-w-md text-sm leading-relaxed">
                       Select an exercise from the sidebar to start practicing your bass skills.
                     </p>
