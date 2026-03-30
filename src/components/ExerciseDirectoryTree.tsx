@@ -7,6 +7,22 @@ interface ExerciseDirectoryTreeProps {
   selectedFolderId: string;
   onSelectNode: (id: string) => void;
   onToggleFolder: (id: string) => void;
+  searchQuery?: string;
+}
+
+function filterTree(node: DirectoryFolder, query: string): DirectoryFolder | null {
+  const q = query.toLowerCase();
+  const filteredChildren: DirectoryNode[] = [];
+  for (const child of node.children) {
+    if (child.type === 'file') {
+      if (child.name.toLowerCase().includes(q)) filteredChildren.push(child);
+    } else {
+      const filtered = filterTree(child, q);
+      if (filtered) filteredChildren.push(filtered);
+    }
+  }
+  if (filteredChildren.length === 0) return null;
+  return { ...node, expanded: true, children: filteredChildren };
 }
 
 export default function ExerciseDirectoryTree({
@@ -14,21 +30,30 @@ export default function ExerciseDirectoryTree({
   selectedNodeId,
   onSelectNode,
   onToggleFolder,
+  searchQuery = '',
 }: ExerciseDirectoryTreeProps) {
+  const displayRoot = searchQuery.trim()
+    ? (filterTree(root, searchQuery.trim()) ?? { ...root, children: [] })
+    : root;
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1 overflow-y-auto p-2 scrollbar-autohide">
-        {root.children.map((child) => (
-          <TreeNode
-            key={child.id}
-            node={child}
-            depth={0}
-            isLast={true}
-            selectedNodeId={selectedNodeId}
-            onSelectNode={onSelectNode}
-            onToggleFolder={onToggleFolder}
-          />
-        ))}
+        {displayRoot.children.length === 0 && searchQuery.trim() ? (
+          <p className="text-xs text-zinc-500 px-2 py-4 text-center">No results</p>
+        ) : (
+          displayRoot.children.map((child) => (
+            <TreeNode
+              key={child.id}
+              node={child}
+              depth={0}
+              isLast={true}
+              selectedNodeId={selectedNodeId}
+              onSelectNode={onSelectNode}
+              onToggleFolder={searchQuery.trim() ? () => {} : onToggleFolder}
+            />
+          ))
+        )}
       </div>
     </div>
   );

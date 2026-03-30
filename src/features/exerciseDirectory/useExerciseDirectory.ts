@@ -111,16 +111,6 @@ function findParentFolderId(root: DirectoryFolder, childId: string): string | nu
   return parentId;
 }
 
-function updateNode(
-  node: DirectoryNode,
-  targetId: string,
-  updater: (node: DirectoryNode) => DirectoryNode,
-): DirectoryNode {
-  if (node.id === targetId) return updater(node);
-  if (node.type !== 'folder') return node;
-  return { ...node, children: node.children.map((c) => updateNode(c, targetId, updater)) };
-}
-
 /** Collect IDs of all folders that are ancestors of `targetId`. */
 function findAncestorFolderIds(root: DirectoryFolder, targetId: string): Set<string> {
   const ancestors = new Set<string>();
@@ -148,6 +138,38 @@ function expandFolders(node: DirectoryNode, ids: Set<string>): DirectoryNode {
     expanded: ids.has(node.id) ? true : node.expanded,
     children: node.children.map((c) => expandFolders(c, ids)),
   };
+}
+
+/** Recursively collapse a folder and all its descendants. */
+function collapseAll(node: DirectoryNode): DirectoryNode {
+  if (node.type !== 'folder') return node;
+  return { ...node, expanded: false, children: node.children.map(collapseAll) };
+}
+
+/**
+ * Toggle the target folder. If expanding, collapse all sibling folders so only
+ * one folder per level is open at a time (accordion behaviour).
+ */
+function toggleFolderAccordion(node: DirectoryNode, targetId: string): DirectoryNode {
+  if (node.type !== 'folder') return node;
+
+  const directChild = node.children.find((c) => c.id === targetId);
+  if (directChild) {
+    const willExpand = directChild.type === 'folder' && !(directChild as DirectoryFolder).expanded;
+    return {
+      ...node,
+      children: node.children.map((c) => {
+        if (c.id === targetId) {
+          if (c.type !== 'folder') return c;
+          return { ...c, expanded: !c.expanded };
+        }
+        if (willExpand && c.type === 'folder') return collapseAll(c);
+        return c;
+      }),
+    };
+  }
+
+  return { ...node, children: node.children.map((c) => toggleFolderAccordion(c, targetId)) };
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
@@ -184,10 +206,7 @@ export function useExerciseDirectory() {
   }, [selectedNode]);
 
   const toggleFolder = useCallback((folderId: string) => {
-    setRoot((prev) => updateNode(prev, folderId, (node) => {
-      if (node.type !== 'folder') return node;
-      return { ...node, expanded: !node.expanded };
-    }) as DirectoryFolder);
+    setRoot((prev) => toggleFolderAccordion(prev, folderId) as DirectoryFolder);
   }, []);
 
   const selectNode = useCallback((nodeId: string) => {

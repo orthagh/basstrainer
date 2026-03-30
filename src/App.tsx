@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Keyboard, RotateCcw, Info, AudioLines, FolderTree } from 'lucide-react';
+import { Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Keyboard, RotateCcw, Info, AudioLines, FolderTree, Search, X } from 'lucide-react';
 import MetronomeIcon from './components/MetronomeIcon';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { PortalContainerContext } from '@/components/ui/portal-container';
@@ -56,6 +56,8 @@ function App() {
     return exercises.find((exercise) => exercise.id === id) ?? null;
   });
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [dirSearchOpen, setDirSearchOpen] = useState(false);
+  const [dirSearchQuery, setDirSearchQuery] = useState('');
   const [noteData, setNoteData] = useState<TimedNote[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const scorePositionRef = useRef(0);
@@ -363,14 +365,54 @@ function App() {
                   <aside className="w-full sm:w-72 shrink-0 bg-zinc-700 border-r border-border flex flex-col overflow-hidden absolute inset-0 z-40 sm:relative sm:inset-auto shadow-2xl sm:shadow-none animate-in slide-in-from-left duration-200">
                     <div className="flex items-center justify-between px-3 pt-3 pb-2 shrink-0 border-b border-white/10 sm:border-none">
                       <h3 className="font-semibold text-zinc-200 text-sm">Directory</h3>
-                      <button
-                        onClick={() => setSidebarOpen(false)}
-                        className="p-1 text-zinc-400 hover:text-zinc-100 hover:bg-white/10 rounded transition-colors"
-                        title="Collapse sidebar"
-                      >
-                        <PanelLeftClose size={16} />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => {
+                            setDirSearchOpen((s) => {
+                              if (s) setDirSearchQuery('');
+                              return !s;
+                            });
+                          }}
+                          className={`p-1 rounded transition-colors ${dirSearchOpen ? 'text-primary bg-white/10' : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/10'}`}
+                          title="Search files"
+                        >
+                          <Search size={16} />
+                        </button>
+                        <button
+                          onClick={() => setSidebarOpen(false)}
+                          className="p-1 text-zinc-400 hover:text-zinc-100 hover:bg-white/10 rounded transition-colors"
+                          title="Collapse sidebar"
+                        >
+                          <PanelLeftClose size={16} />
+                        </button>
+                      </div>
                     </div>
+                    {dirSearchOpen && (
+                      <div className="px-2 pb-2 shrink-0">
+                        <div className="relative">
+                          <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
+                          <input
+                            autoFocus
+                            type="text"
+                            value={dirSearchQuery}
+                            onChange={(e) => setDirSearchQuery(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') { setDirSearchOpen(false); setDirSearchQuery(''); }
+                            }}
+                            placeholder="Filter files…"
+                            className="w-full bg-zinc-800 text-zinc-200 text-xs rounded pl-6 pr-6 py-1.5 outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-zinc-500"
+                          />
+                          {dirSearchQuery && (
+                            <button
+                              onClick={() => setDirSearchQuery('')}
+                              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200"
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     <div className="flex-1 min-h-0">
                       <ExerciseDirectoryTree
                         root={directory.root}
@@ -378,6 +420,7 @@ function App() {
                         selectedFolderId={directory.selectedFolderId}
                         onSelectNode={directory.selectNode}
                         onToggleFolder={directory.toggleFolder}
+                        searchQuery={dirSearchQuery}
                       />
                     </div>
                   </aside>
