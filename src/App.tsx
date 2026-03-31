@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Keyboard, RotateCcw, Info, AudioLines, FolderTree, Search, X } from 'lucide-react';
+import { Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Keyboard, RotateCcw, Info, AudioLines, FolderTree, Search, X, Github } from 'lucide-react';
 import MetronomeIcon from './components/MetronomeIcon';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { PortalContainerContext } from '@/components/ui/portal-container';
@@ -300,6 +300,15 @@ function App() {
           </div>
 
           <div className="flex items-center gap-1 flex-1 justify-end">
+            <a
+              href="https://github.com/orthagh/basstrainer"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-white/10 rounded-full transition-colors hidden sm:block"
+              title="View on GitHub"
+            >
+              <Github size={20} />
+            </a>
             <button
               onClick={() => setShowWelcome(true)}
               className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-white/10 rounded-full transition-colors hidden sm:block"
