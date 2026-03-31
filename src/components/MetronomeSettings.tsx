@@ -124,7 +124,7 @@ export default function MetronomeSettings({
               step={1}
               value={[config.countInBars]}
               onValueChange={([v]) => update({ countInBars: v })}
-              disabled={!config.enabled}
+              disabled={disabled}
             />
             <p className="text-[10px] text-muted-foreground">
               {config.countInBars === 0

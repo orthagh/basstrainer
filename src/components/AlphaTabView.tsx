@@ -972,7 +972,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     } else {
       // Use built-in metronome — perfectly in sync with playback.
       apiRef.current.metronomeVolume = cfg.enabled ? 1 : 0;
-      apiRef.current.countInVolume = cfg.enabled && cfg.countInBars > 0 ? 1 : 0;
+      apiRef.current.countInVolume = cfg.countInBars > 0 ? 1 : 0;
     }
   }, [metronomeConfig, useCustomClicks]);
 
