@@ -5,12 +5,10 @@ import {
   NotationElement,
   StaveProfile as AlphaTabStaveProfile,
   synth,
-  midi,
   model,
 } from '@coderline/alphatab';
 import type { Exercise } from '../data/exercises';
 import { extractTimedNotes, buildTempoMap, tickToMs, type TimedNote } from '../audio/noteExtractor';
-import { playClick as synthClick } from '../audio/clickSynth';
 import MetronomeSettings, { type MetronomeConfig } from './MetronomeSettings';
 import DisplaySettings from './DisplaySettings';
 import { loadStaveProfile, type StaveProfile } from '@/lib/displaySettings';
@@ -946,73 +944,14 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
   }, [staveProfile, playerReady]);
 
   // ── Metronome volume management ─────────────────
-  // AlphaTab's built-in metronome is sample-accurate (rendered into the same
-  // audio buffer as the playback).  Our custom Web Audio clicks, on the other
-  // hand, are triggered by `midiEventsPlayed` which fires *after* the audio
-  // has already played — up to ~93 ms late with ScriptProcessor (4 096 samples).
-  //
-  // Strategy:
-  //   • Default sound, no accent → use built-in metronome (perfectly in sync)
-  //   • Custom sound OR accent    → mute built-in, use Web Audio clicks
-  //     (slight latency is the trade-off for custom timbre / accent)
-
-  const useCustomClicks = metronomeConfig.enabled &&
-    (metronomeConfig.accentFirstBeat || metronomeConfig.clickSound !== 'default');
-
+  // Always use AlphaTab's built-in metronome, which is rendered sample-accurately
+  // inside the same audio buffer as playback.
   useEffect(() => {
     if (!apiRef.current) return;
     const cfg = metronomeConfig;
-
-    if (useCustomClicks) {
-      // Custom clicks active — silence ALL built-in sounds to avoid doubling.
-      // countInVolume must stay > 0 to keep the count-in phase active, but
-      // low enough to be inaudible.
-      apiRef.current.metronomeVolume = 0;
-      apiRef.current.countInVolume = cfg.countInBars > 0 ? 0.01 : 0;
-    } else {
-      // Use built-in metronome — perfectly in sync with playback.
-      apiRef.current.metronomeVolume = cfg.enabled ? 1 : 0;
-      apiRef.current.countInVolume = cfg.countInBars > 0 ? 1 : 0;
-    }
-  }, [metronomeConfig, useCustomClicks]);
-
-  // ── Custom click sound & accent via Web Audio ──────────
-  const metronomeConfigRef = useRef(metronomeConfig);
-  metronomeConfigRef.current = metronomeConfig;
-
-  // Build a simple click using the shared synthesiser
-  const playClick = useCallback((accent: boolean) => {
-    const cfg = metronomeConfigRef.current;
-    if (!cfg.enabled) return;
-    synthClick(cfg.clickSound, accent && cfg.accentFirstBeat, cfg.volume ?? 1);
-  }, []);
-
-// Subscribe to AlphaTab metronome MIDI events for custom click
-  useEffect(() => {
-    const api = apiRef.current;
-    if (!api) return;
-
-    const handleEvents = (e: { events: unknown[] }) => {
-      for (const evt of e.events) {
-        const me = evt as { isMetronome?: boolean; metronomeNumerator?: number };
-        if (me.isMetronome) {
-          // Custom click sound (only when a non-default sound or accent is active)
-          const cfg = metronomeConfigRef.current;
-          if (cfg.enabled && (cfg.accentFirstBeat || cfg.clickSound !== 'default')) {
-            playClick(me.metronomeNumerator === 0);
-          }
-        }
-      }
-    };
-
-    // Tell AlphaTab to emit metronome events
-    api.midiEventsPlayedFilter = [midi.MidiEventType.AlphaTabMetronome];
-    api.midiEventsPlayed.on(handleEvents);
-
-    return () => {
-      api.midiEventsPlayed.off(handleEvents);
-    };
-  }, [playClick]);
+    apiRef.current.metronomeVolume = cfg.enabled ? cfg.volume : 0;
+    apiRef.current.countInVolume = cfg.countInBars > 0 ? cfg.volume : 0;
+  }, [metronomeConfig]);
 
   // Looping
   const toggleLoop = useCallback(() => {

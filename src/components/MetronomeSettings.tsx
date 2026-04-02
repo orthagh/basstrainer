@@ -1,10 +1,9 @@
 /**
- * MetronomeSettings — popover with advanced metronome options.
+ * MetronomeSettings — popover with metronome options.
  *
  * - Toggle metronome on/off
  * - Bar countdown before playback
- * - Click sound selection
- * - Accent the first beat of each bar
+ * - Volume control
  */
 
 import { useCallback } from 'react';
@@ -13,39 +12,18 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
-import { Toggle } from '@/components/ui/toggle';
 import { Separator } from '@/components/ui/separator';
 import { Volume2, ChevronDown } from 'lucide-react';
 import MetronomeIcon from './MetronomeIcon';
-import { playClickPreview, type ClickSound } from '../audio/clickSynth';
-
-export type { ClickSound };
 
 export interface MetronomeConfig {
   enabled: boolean;
   countInBars: number;
-  clickSound: ClickSound;
-  accentFirstBeat: boolean;
-  /** 0–1 master volume for click sounds, default 1 */
+  /** 0–1 volume for the built-in AlphaTab metronome, default 1 */
   volume: number;
 }
-
-const SOUND_LABELS: Record<ClickSound, string> = {
-  default: 'Default',
-  woodblock: 'Woodblock',
-  rimshot: 'Rimshot',
-  cowbell: 'Cowbell',
-  mechanical: 'Mechanical',
-};
 
 interface MetronomeSettingsProps {
   config: MetronomeConfig;
@@ -135,42 +113,6 @@ export default function MetronomeSettings({
 
           <Separator />
 
-          {/* Click sound */}
-          <div className="space-y-2">
-            <Label className="text-xs" htmlFor="click-sound">
-              Click sound
-            </Label>
-            <div className="flex items-center gap-2">
-              <Select
-                value={config.clickSound}
-                onValueChange={(v) => update({ clickSound: v as ClickSound })}
-                disabled={!config.enabled}
-              >
-                <SelectTrigger id="click-sound" className="h-8 text-xs flex-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(SOUND_LABELS).map(([key, label]) => (
-                    <SelectItem key={key} value={key} className="text-xs">
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <button
-                type="button"
-                onClick={() => playClickPreview(config.clickSound)}
-                disabled={!config.enabled}
-                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 transition-colors"
-                title="Preview sound"
-              >
-                <Volume2 size={14} />
-              </button>
-            </div>
-          </div>
-
-          <Separator />
-
           {/* Volume */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -191,27 +133,6 @@ export default function MetronomeSettings({
               onValueChange={([v]) => update({ volume: v })}
               disabled={!config.enabled}
             />
-          </div>
-
-          <Separator />
-
-          {/* Accent first beat */}
-          <div className="flex items-center justify-between">
-            <Label className="text-xs" htmlFor="accent-first">
-              Accent first beat
-            </Label>
-            <Toggle
-              id="accent-first"
-              pressed={config.accentFirstBeat}
-              onPressedChange={(pressed) =>
-                update({ accentFirstBeat: pressed })
-              }
-              size="sm"
-              disabled={!config.enabled}
-              className="data-[state=on]:bg-primary/10 data-[state=on]:text-primary"
-            >
-              {config.accentFirstBeat ? 'ON' : 'OFF'}
-            </Toggle>
           </div>
         </div>
       </PopoverContent>

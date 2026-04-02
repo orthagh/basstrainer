@@ -87,7 +87,7 @@ function App() {
       const saved = localStorage.getItem(METRONOME_CONFIG_LS_KEY);
       if (saved) return { ...JSON.parse(saved) };
     } catch { /* ignore */ }
-    return { enabled: false, countInBars: 0, clickSound: 'default', accentFirstBeat: true, volume: 1 };
+    return { enabled: false, countInBars: 0, volume: 1 };
   });
 
   useEffect(() => {
