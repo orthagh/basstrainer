@@ -42,25 +42,6 @@ interface SectionMarker {
   startTick: number;
 }
 
-interface LoopHighlightRect {
-  barIndex: number;
-  startTick: number;
-  endTick: number;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  /** Full staff-row y/h including both stave + tab stave */
-  rowY: number;
-  rowH: number;
-}
-
-interface LoopBeatRange {
-  beat: InstanceType<typeof model.Beat>;
-  startTick: number;
-  endTick: number;
-}
-
 type AlphaTabTrack = InstanceType<typeof model.Track>;
 
 function sameIndexes(left: number[], right: number[]): boolean {
@@ -165,61 +146,6 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
   const onPositionChangeRef = useRef(onPositionChange);
   onPositionChangeRef.current = onPositionChange;
 
-  const refreshLoopBars = useCallback(() => {
-    const api = apiRef.current;
-    const score = api?.score;
-    const renderedTracks = api?.tracks.length ? api.tracks : score?.tracks ?? [];
-
-    if (!score || renderedTracks.length === 0 || renderedTracks[0].staves.length === 0) {
-      setLoopSelectableBeats([]);
-      loopBeatIndexMapRef.current = new Map();
-      return;
-    }
-
-    const firstStaff = renderedTracks[0].staves[0];
-    if (firstStaff.bars.length === 0) {
-      setLoopSelectableBeats([]);
-      loopBeatIndexMapRef.current = new Map();
-      return;
-    }
-
-    let maxTick = 0;
-    for (const track of renderedTracks) {
-      for (const staff of track.staves) {
-        for (const bar of staff.bars) {
-          for (const voice of bar.voices) {
-            for (const beat of voice.beats) {
-              maxTick = Math.max(maxTick, beat.absolutePlaybackStart + beat.playbackDuration);
-            }
-          }
-        }
-      }
-    }
-
-    const beats: LoopBeatRange[] = [];
-    const beatIndexMap = new Map<InstanceType<typeof model.Beat>, number>();
-    for (const staff of renderedTracks[0].staves) {
-      for (const bar of staff.bars) {
-        for (const voice of bar.voices) {
-          for (const beat of voice.beats) {
-            const startTick = beat.absolutePlaybackStart;
-            const endTick = startTick + beat.playbackDuration;
-            if (endTick <= startTick) {
-              continue;
-            }
-
-            const beatIndex = beats.length;
-            beatIndexMap.set(beat, beatIndex);
-            beats.push({ beat, startTick, endTick });
-          }
-        }
-      }
-    }
-
-    setLoopSelectableBeats(beats);
-    loopBeatIndexMapRef.current = beatIndexMap;
-  }, []);
-
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [playerReady, setPlayerReady] = useState(false);
@@ -235,14 +161,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
   const [beatBoundsMap, setBeatBoundsMap] = useState<Map<number, BeatRect>>(new Map());
   const [sections, setSections] = useState<SectionMarker[]>([]);
 
-  const [loopSelectableBeats, setLoopSelectableBeats] = useState<LoopBeatRange[]>([]);
   const [isLooping, setIsLooping] = useState(false);
-  const [hasLoopSelection, setHasLoopSelection] = useState(false);
-  const [isLoopDragging, setIsLoopDragging] = useState(false);
-  const [loopDragStartBeatIndex, setLoopDragStartBeatIndex] = useState<number | null>(null);
-  const [loopSelectionStartTick, setLoopSelectionStartTick] = useState<number | null>(null);
-  const [loopSelectionEndTick, setLoopSelectionEndTick] = useState<number | null>(null);
-  const [loopHighlightRects, setLoopHighlightRects] = useState<LoopHighlightRect[]>([]);
   const [availableTracks, setAvailableTracks] = useState<AlphaTabTrack[]>([]);
   const [selectedTrackIndex, setSelectedTrackIndex] = useState<number | null>(null);
   const [mutedTrackIndexes, setMutedTrackIndexes] = useState<number[]>([]);
@@ -253,7 +172,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
   const [scoreInfo, setScoreInfo] = useState<{ title: string; artist: string; tunings: Map<number, string[]> } | null>(null);
 
   const activeVolumeTimeoutRef = useRef<number | null>(null);
-  const loopBeatIndexMapRef = useRef<Map<InstanceType<typeof model.Beat>, number>>(new Map());
+  const dragStartBeatRef = useRef<InstanceType<typeof model.Beat> | null>(null);
   /** Map beatIndex → actual AlphaTab Beat object (for native note coloring). */
   const beatObjectMapRef = useRef<Map<number, InstanceType<typeof model.Beat>>>(new Map());
   /** Track which beatIndices already have styles applied (avoid redundant work). */
@@ -274,14 +193,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     setMutedTrackIndexes([]);
     setSoloTrackIndexes([]);
     setTrackVolumes({});
-    setLoopSelectableBeats([]);
     setSections([]);
-    setHasLoopSelection(false);
-    setIsLoopDragging(false);
-    setLoopDragStartBeatIndex(null);
-    setLoopSelectionStartTick(null);
-    setLoopSelectionEndTick(null);
-    setLoopHighlightRects([]);
 
     const api = new AlphaTabApi(containerRef.current, {
       core: {
@@ -394,12 +306,10 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
         setBeatBoundsMap(map);
         beatObjectMapRef.current = beatObjMap;
       }
-      refreshLoopBars();
     });
 
     api.playerReady.on(() => {
       setPlayerReady(true);
-      refreshLoopBars();
       onReady?.();
       // For GP files, read the actual tempo from the score instead of the placeholder.
       if (exercise.filePath && api.score) {
@@ -453,6 +363,23 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
       onPositionChangeRef.current?.(args.currentTime);
     });
 
+    // ── Loop selection via AlphaTab's native beat mouse events ───────────
+    api.beatMouseDown.on((beat) => {
+      dragStartBeatRef.current = beat as InstanceType<typeof model.Beat>;
+      api.highlightPlaybackRange(beat, beat);
+    });
+    api.beatMouseMove.on((beat) => {
+      if (!dragStartBeatRef.current) return;
+      api.highlightPlaybackRange(dragStartBeatRef.current, beat);
+    });
+    api.beatMouseUp.on((beat) => {
+      if (!dragStartBeatRef.current) return;
+      const endBeat = (beat ?? dragStartBeatRef.current) as InstanceType<typeof model.Beat>;
+      api.highlightPlaybackRange(dragStartBeatRef.current, endBeat);
+      api.applyPlaybackRangeFromHighlight();
+      dragStartBeatRef.current = null;
+    });
+
     // Load the exercise — GP binary file or AlphaTex string
     if (exercise.filePath) {
       api.load(exercise.filePath);
@@ -492,199 +419,6 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
 
     api.renderTracks([nextTrack]);
   }, [availableTracks, selectedTrackIndex]);
-
-  useEffect(() => {
-    if (loopSelectableBeats.length === 0) {
-      setLoopDragStartBeatIndex(null);
-      setIsLoopDragging(false);
-      return;
-    }
-
-    if (loopDragStartBeatIndex !== null && loopDragStartBeatIndex >= loopSelectableBeats.length) {
-      setLoopDragStartBeatIndex(null);
-      setIsLoopDragging(false);
-    }
-  }, [loopDragStartBeatIndex, loopSelectableBeats]);
-
-  const refreshLoopHighlights = useCallback(() => {
-    const api = apiRef.current;
-    const lookup = api?.renderer.boundsLookup;
-
-    if (!lookup || loopSelectableBeats.length === 0) {
-      setLoopHighlightRects([]);
-      return;
-    }
-
-    // Build full-height row bounds from bar lineAlignedBounds (covers notation + tab stave)
-    const staffRowBounds: { y: number; h: number }[] = [];
-    for (const staffSystem of lookup.staffSystems) {
-      if (staffSystem.bars.length > 0) {
-        const b = staffSystem.bars[0].lineAlignedBounds
-          ?? staffSystem.bars[0].realBounds
-          ?? staffSystem.bars[0].visualBounds;
-        staffRowBounds.push({ y: b.y, h: b.h });
-      }
-    }
-
-    const rects: LoopHighlightRect[] = [];
-
-    for (const beatRange of loopSelectableBeats) {
-      const beatBounds = lookup.findBeat(beatRange.beat);
-      if (!beatBounds) {
-        continue;
-      }
-
-      const vb = beatBounds.visualBounds;
-      const beatCenterY = vb.y + vb.h / 2;
-      const row = staffRowBounds.find((r) => beatCenterY >= r.y && beatCenterY <= r.y + r.h)
-        ?? { y: vb.y, h: vb.h };
-
-      rects.push({
-        barIndex: 0,
-        startTick: beatRange.startTick,
-        endTick: beatRange.endTick,
-        x: vb.x,
-        y: vb.y,
-        w: vb.w,
-        h: vb.h,
-        rowY: row.y,
-        rowH: row.h,
-      });
-    }
-
-    setLoopHighlightRects(rects);
-  }, [loopSelectableBeats]);
-
-  useEffect(() => {
-    refreshLoopHighlights();
-  }, [refreshLoopHighlights]);
-
-  const setLoopRangeFromBeatIndexes = useCallback((startIndex: number, endIndex: number) => {
-    const clampedStart = Math.max(0, Math.min(startIndex, loopSelectableBeats.length - 1));
-    const clampedEnd = Math.max(0, Math.min(endIndex, loopSelectableBeats.length - 1));
-    const fromIndex = Math.min(clampedStart, clampedEnd);
-    const toIndex = Math.max(clampedStart, clampedEnd);
-
-    const startTick = loopSelectableBeats[fromIndex]?.startTick ?? null;
-    const endTick = loopSelectableBeats[toIndex]?.endTick ?? null;
-    if (startTick === null || endTick === null) {
-      return;
-    }
-
-    setLoopSelectionStartTick(startTick);
-    setLoopSelectionEndTick(endTick);
-    setHasLoopSelection(true);
-  }, [loopSelectableBeats]);
-
-  const applyLoopRangeForBeatIndexes = useCallback((startIndex: number, endIndex: number) => {
-    const api = apiRef.current;
-    if (!api || loopSelectableBeats.length === 0) return;
-
-    const clampedStart = Math.max(0, Math.min(startIndex, loopSelectableBeats.length - 1));
-    const clampedEnd = Math.max(0, Math.min(endIndex, loopSelectableBeats.length - 1));
-    const fromIndex = Math.min(clampedStart, clampedEnd);
-    const toIndex = Math.max(clampedStart, clampedEnd);
-
-    const startTick = loopSelectableBeats[fromIndex]?.startTick;
-    const endTick = loopSelectableBeats[toIndex]?.endTick;
-    if (startTick === undefined || endTick === undefined || endTick <= startTick) {
-      return;
-    }
-
-    api.playbackRange = { startTick, endTick };
-    api.isLooping = true;
-    setIsLooping(true);
-    setLoopSelectionStartTick(startTick);
-    setLoopSelectionEndTick(endTick);
-    setHasLoopSelection(true);
-  }, [loopSelectableBeats]);
-
-  const getBeatIndexFromPointerPosition = useCallback((clientX: number, clientY: number): number | null => {
-    const api = apiRef.current;
-    const lookup = api?.renderer.boundsLookup;
-    const scoreElement = containerRef.current;
-
-    if (!lookup || !scoreElement || loopSelectableBeats.length === 0) {
-      return null;
-    }
-
-    const rect = scoreElement.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-    const beat = lookup.getBeatAtPos(x, y) as InstanceType<typeof model.Beat> | null;
-
-    if (!beat) {
-      return null;
-    }
-
-    const mappedIndex = loopBeatIndexMapRef.current.get(beat);
-    if (mappedIndex === undefined) {
-      return null;
-    }
-
-    return mappedIndex;
-  }, [loopSelectableBeats]);
-
-  const handleLoopSelectionPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (!isLooping || event.button !== 0) {
-      return;
-    }
-
-    const clickedBeatIndex = getBeatIndexFromPointerPosition(event.clientX, event.clientY);
-    if (clickedBeatIndex === null) {
-      return;
-    }
-
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-
-    setIsLoopDragging(true);
-    setLoopDragStartBeatIndex(clickedBeatIndex);
-    setLoopRangeFromBeatIndexes(clickedBeatIndex, clickedBeatIndex);
-  }, [getBeatIndexFromPointerPosition, isLooping, setLoopRangeFromBeatIndexes]);
-
-  const handleLoopSelectionPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (!isLooping || !isLoopDragging || loopDragStartBeatIndex === null) {
-      return;
-    }
-
-    const hoveredBeatIndex = getBeatIndexFromPointerPosition(event.clientX, event.clientY);
-    if (hoveredBeatIndex === null) {
-      return;
-    }
-
-    setLoopRangeFromBeatIndexes(loopDragStartBeatIndex, hoveredBeatIndex);
-  }, [getBeatIndexFromPointerPosition, isLoopDragging, isLooping, loopDragStartBeatIndex, setLoopRangeFromBeatIndexes]);
-
-  const handleLoopSelectionPointerUp = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (!isLooping || !isLoopDragging || loopDragStartBeatIndex === null) {
-      return;
-    }
-
-    const releasedBeatIndex = getBeatIndexFromPointerPosition(event.clientX, event.clientY) ?? loopDragStartBeatIndex;
-
-    event.preventDefault();
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-
-    setIsLoopDragging(false);
-    setLoopDragStartBeatIndex(null);
-    applyLoopRangeForBeatIndexes(loopDragStartBeatIndex, releasedBeatIndex);
-  }, [applyLoopRangeForBeatIndexes, getBeatIndexFromPointerPosition, isLoopDragging, isLooping, loopDragStartBeatIndex]);
-
-  const handleLoopSelectionPointerCancel = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (!isLoopDragging) {
-      return;
-    }
-
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-
-    setIsLoopDragging(false);
-    setLoopDragStartBeatIndex(null);
-  }, [isLoopDragging]);
 
   useEffect(() => {
     const api = apiRef.current;
@@ -953,37 +687,18 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     apiRef.current.countInVolume = cfg.countInBars > 0 ? cfg.volume : 0;
   }, [metronomeConfig]);
 
-  // Looping
+  // Looping — toggle on/off; range is set by dragging on the score
   const toggleLoop = useCallback(() => {
     const api = apiRef.current;
     if (!api) return;
-
     if (isLooping) {
       api.isLooping = false;
-      api.playbackRange = null;
       setIsLooping(false);
-      setIsLoopDragging(false);
-      setLoopDragStartBeatIndex(null);
-      return;
-    }
-
-    setIsLoopDragging(false);
-    setLoopDragStartBeatIndex(null);
-
-    if (hasLoopSelection && loopSelectionStartTick !== null && loopSelectionEndTick !== null && loopSelectionEndTick > loopSelectionStartTick) {
-      api.playbackRange = { startTick: loopSelectionStartTick, endTick: loopSelectionEndTick };
+    } else {
       api.isLooping = true;
       setIsLooping(true);
-      return;
     }
-
-    if (loopSelectableBeats.length === 0) {
-      return;
-    }
-
-    setLoopRangeFromBeatIndexes(0, 0);
-    applyLoopRangeForBeatIndexes(0, 0);
-  }, [applyLoopRangeForBeatIndexes, hasLoopSelection, isLooping, loopSelectableBeats.length, loopSelectionEndTick, loopSelectionStartTick, setLoopRangeFromBeatIndexes]);
+  }, [isLooping]);
 
   const toggleTrackMute = useCallback((trackIndex: number) => {
     setMutedTrackIndexes((previous) => (
@@ -1027,31 +742,6 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
       window.clearTimeout(activeVolumeTimeoutRef.current);
     }
   }, []);
-
-  // Merge selected beat rects into one rectangle per staff row
-  const loopSelectionMergedRects = (() => {
-    if (!isLooping || !hasLoopSelection || loopSelectionStartTick === null || loopSelectionEndTick === null) {
-      return [];
-    }
-
-    const byRow = new Map<number, { minX: number; maxX: number; rowY: number; rowH: number }>();
-
-    for (const rect of loopHighlightRects) {
-      if (rect.endTick <= loopSelectionStartTick || rect.startTick >= loopSelectionEndTick) {
-        continue;
-      }
-
-      const existing = byRow.get(rect.rowY);
-      if (existing) {
-        existing.minX = Math.min(existing.minX, rect.x);
-        existing.maxX = Math.max(existing.maxX, rect.x + rect.w);
-      } else {
-        byRow.set(rect.rowY, { minX: rect.x, maxX: rect.x + rect.w, rowY: rect.rowY, rowH: rect.rowH });
-      }
-    }
-
-    return Array.from(byRow.values());
-  })();
 
   // Expose transport actions to parent via ref
   useImperativeHandle(ref, () => ({
@@ -1492,25 +1182,8 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
           </div>
         )}
 
-        <div
-          className={`relative ${isLooping ? 'cursor-ew-resize' : ''}`}
-          onPointerDown={handleLoopSelectionPointerDown}
-          onPointerMove={handleLoopSelectionPointerMove}
-          onPointerUp={handleLoopSelectionPointerUp}
-          onPointerCancel={handleLoopSelectionPointerCancel}
-        >
+        <div className="relative">
           <div ref={containerRef} className="at-main" />
-          {isLooping && loopSelectionMergedRects.length > 0 && (
-            <div className="absolute inset-0 pointer-events-none z-[2]">
-              {loopSelectionMergedRects.map((r, i) => (
-                <div
-                  key={`loop-sel-${i}`}
-                  className="absolute rounded ring-2 ring-primary/80 bg-primary/10"
-                  style={{ left: r.minX, top: r.rowY, width: r.maxX - r.minX, height: r.rowH }}
-                />
-              ))}
-            </div>
-          )}
           {noteEvaluations.length > 0 && beatBoundsMap.size > 0 && (
             <NoteEvaluationOverlay
               evaluations={noteEvaluations}
