@@ -80,6 +80,14 @@ function getDefaultSelectedTrackIndex(tracks: AlphaTabTrack[]): number | null {
     return bassTrack.index;
   }
 
+  const bassStringTrack = tracks.find((track) => {
+    const stringCount = track.staves?.[0]?.tuning?.length ?? 0;
+    return stringCount === 4 || stringCount === 5;
+  });
+  if (bassStringTrack) {
+    return bassStringTrack.index;
+  }
+
   const visibleTrack = tracks.find((track) => track.isVisibleOnMultiTrack);
   return (visibleTrack ?? tracks[0]).index;
 }
