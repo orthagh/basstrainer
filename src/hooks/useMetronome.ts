@@ -88,7 +88,7 @@ const MIN_BPM = 20;
 const MAX_BPM = 300;
 
 const DEFAULT_CONFIG: MetronomeConfig = {
-  tempo: 120,
+  tempo: 80,
   beatsPerBar: 4,
   subdivision: 'quarter',
   accentPattern: [true, false, false, false],
