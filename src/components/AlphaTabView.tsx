@@ -7,34 +7,16 @@ import {
   synth,
   model,
 } from '@coderline/alphatab';
-import type { Exercise } from '../data/exercises';
-import { extractTimedNotes, buildTempoMap, tickToMs, type TimedNote } from '../audio/noteExtractor';
+import type { Exercise } from '../types';
+import { buildTempoMap, tickToMs } from '../audio/noteExtractor';
 import MetronomeSettings, { type MetronomeConfig } from './MetronomeSettings';
 import DisplaySettings from './DisplaySettings';
 import { loadStaveProfile, type StaveProfile } from '@/lib/displaySettings';
 import BpmDisplay from './BpmDisplay';
-import MicFeedbackDisplay from './MicFeedbackDisplay';
-import type { PitchResult } from '../audio/pitchDetector';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { Slider } from '@/components/ui/slider';
-import { Label } from '@/components/ui/label';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { Icon } from '@iconify/react';
 import InstrumentIcon from './InstrumentIcon';
-import type { NoteEvaluation } from '../evaluation/types';
-import NoteEvaluationOverlay, { type BeatRect } from './NoteEvaluationOverlay';
-
-export type { TimedNote as NoteEvent };
-
-// ── Note evaluation color constants ─────────────
-const EVAL_ON_TIME_MS = 20;
-const EVAL_COLOR_HIT    = new model.Color(34, 197, 94);    // emerald-500
-const EVAL_COLOR_TIMING = new model.Color(245, 158, 11);   // amber-500
-const EVAL_COLOR_MISS   = new model.Color(239, 68, 68);    // red-500
 
 interface SectionMarker {
   text: string;
@@ -111,38 +93,20 @@ interface AlphaTabViewProps {
   sidebarWidth?: number;
   onReady?: () => void;
   onTempoChange?: (tempo: number) => void;
-  onNoteDataExtracted?: (notes: TimedNote[]) => void;
   onPlayStateChange?: (isPlaying: boolean) => void;
   onPositionChange?: (positionMs: number) => void;
   metronomeConfig: MetronomeConfig;
   onMetronomeConfigChange: (config: MetronomeConfig) => void;
-  isListening?: boolean;
-  currentPitch?: PitchResult;
-  onToggleMic?: () => void;
-  latencyMs?: number;
-  onLatencyChange?: (ms: number) => void;
-  noteEvaluations?: NoteEvaluation[];
-  demoMode?: boolean;
-  onToggleDemo?: () => void;
 }
 
 const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function AlphaTabView({
   exercise,
   sidebarWidth = 0,
   onReady,
-  onNoteDataExtracted,
   onPlayStateChange,
   onPositionChange,
   metronomeConfig,
   onMetronomeConfigChange,
-  isListening = false,
-  currentPitch,
-  onToggleMic,
-  latencyMs = 0,
-  onLatencyChange,
-  noteEvaluations = [],
-  demoMode = false,
-  onToggleDemo,
 }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -164,9 +128,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
   const [currentTime, setCurrentTime] = useState(0);
   const [endTime, setEndTime] = useState(0);
   const [scoreDurationMs, setScoreDurationMs] = useState(0);
-  const [isMuted, setIsMuted] = useState(false);
   const [staveProfile, setStaveProfile] = useState<StaveProfile>(() => loadStaveProfile());
-  const [beatBoundsMap, setBeatBoundsMap] = useState<Map<number, BeatRect>>(new Map());
   const [sections, setSections] = useState<SectionMarker[]>([]);
 
   const [isLooping, setIsLooping] = useState(false);
@@ -181,10 +143,6 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
 
   const activeVolumeTimeoutRef = useRef<number | null>(null);
   const dragStartBeatRef = useRef<InstanceType<typeof model.Beat> | null>(null);
-  /** Map beatIndex → actual AlphaTab Beat object (for native note coloring). */
-  const beatObjectMapRef = useRef<Map<number, InstanceType<typeof model.Beat>>>(new Map());
-  /** Track which beatIndices already have styles applied (avoid redundant work). */
-  const styledBeatsRef = useRef<Set<number>>(new Set());
 
   // Initialise AlphaTab
   useEffect(() => {
@@ -287,33 +245,6 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     api.renderFinished.on(() => {
       setIsLoading(false);
       viewportRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-      // Build beat bounds map for note evaluation overlay
-      const lookup = api.renderer.boundsLookup;
-      const score = api.score;
-      if (lookup && score) {
-        const map = new Map<number, BeatRect>();
-        const beatObjMap = new Map<number, InstanceType<typeof model.Beat>>();
-        let bi = 0;
-        for (const track of score.tracks) {
-          for (const staff of track.staves) {
-            for (const bar of staff.bars) {
-              for (const voice of bar.voices) {
-                for (const beat of voice.beats) {
-                  const bb = lookup.findBeat(beat);
-                  if (bb) {
-                    const vb = bb.visualBounds;
-                    map.set(bi, { x: vb.x, y: vb.y, w: vb.w, h: vb.h });
-                  }
-                  beatObjMap.set(bi, beat);
-                  bi++;
-                }
-              }
-            }
-          }
-        }
-        setBeatBoundsMap(map);
-        beatObjectMapRef.current = beatObjMap;
-      }
     });
 
     api.playerReady.on(() => {
@@ -323,12 +254,6 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
       if (exercise.filePath && api.score) {
         baseTempo.current = api.score.tempo;
         setTempo(api.score.tempo);
-      }
-
-      // Extract note timing data once MIDI is loaded
-      if (onNoteDataExtracted) {
-        const timedNotes = extractTimedNotes(api);
-        onNoteDataExtracted(timedNotes);
       }
 
       // Extract section markers for the progress bar
@@ -467,100 +392,6 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     }
   }, [availableTracks, trackVolumes]);
 
-  // ── Apply note colours via AlphaTab model styles ────────
-  // Colours: green (hit, good timing), amber (hit, off timing), red (miss)
-
-  const noteEvaluationsRef = useRef(noteEvaluations);
-  noteEvaluationsRef.current = noteEvaluations;
-
-  /** Remove all note/beat styles we applied. */
-  const clearNoteColors = useCallback(() => {
-    for (const bi of styledBeatsRef.current) {
-      const beat = beatObjectMapRef.current.get(bi);
-      if (!beat) continue;
-      beat.style = undefined;
-      for (const note of beat.notes) {
-        note.style = undefined;
-      }
-    }
-    styledBeatsRef.current.clear();
-  }, []);
-
-  /** Apply colours for all current evaluations onto the AlphaTab model. */
-  const applyNoteColors = useCallback(() => {
-    const api = apiRef.current;
-    if (!api) return;
-
-    // Group evaluations by beat — keep the worst status per beat
-    const beatStatusMap = new Map<number, { isHit: boolean; timingOffsetMs: number }>();
-    for (const ev of noteEvaluationsRef.current) {
-      const bi = ev.expected.beatIndex;
-      const existing = beatStatusMap.get(bi);
-      // Prioritise: miss > timing-off > hit
-      const evPriority = !ev.isHit ? 2 : Math.abs(ev.timingOffsetMs) > EVAL_ON_TIME_MS ? 1 : 0;
-      const existingPriority = existing
-        ? (!existing.isHit ? 2 : Math.abs(existing.timingOffsetMs) > EVAL_ON_TIME_MS ? 1 : 0)
-        : -1;
-      if (evPriority > existingPriority) {
-        beatStatusMap.set(bi, { isHit: ev.isHit, timingOffsetMs: ev.timingOffsetMs });
-      }
-    }
-
-    for (const [bi, { isHit, timingOffsetMs }] of beatStatusMap) {
-      const beat = beatObjectMapRef.current.get(bi);
-      if (!beat) continue;
-
-      const color = !isHit
-        ? EVAL_COLOR_MISS
-        : Math.abs(timingOffsetMs) > EVAL_ON_TIME_MS
-          ? EVAL_COLOR_TIMING
-          : EVAL_COLOR_HIT;
-
-      // Colour the beat elements (stems, beams, flags)
-      if (!beat.style) {
-        beat.style = new model.BeatStyle();
-      }
-      beat.style.colors.set(model.BeatSubElement.StandardNotationStem, color);
-      beat.style.colors.set(model.BeatSubElement.StandardNotationFlags, color);
-      beat.style.colors.set(model.BeatSubElement.StandardNotationBeams, color);
-      beat.style.colors.set(model.BeatSubElement.GuitarTabStem, color);
-      beat.style.colors.set(model.BeatSubElement.GuitarTabFlags, color);
-      beat.style.colors.set(model.BeatSubElement.GuitarTabBeams, color);
-
-      // Colour each note (note head / tab number)
-      for (const note of beat.notes) {
-        if (!note.style) {
-          note.style = new model.NoteStyle();
-        }
-        note.style.colors.set(model.NoteSubElement.StandardNotationNoteHead, color);
-        note.style.colors.set(model.NoteSubElement.GuitarTabFretNumber, color);
-      }
-
-      styledBeatsRef.current.add(bi);
-    }
-  }, []);
-
-  // When playback stops and we have evaluations → apply native note colors & re-render
-  const wasPlayingRef = useRef(false);
-  useEffect(() => {
-    const wasPlaying = wasPlayingRef.current;
-    wasPlayingRef.current = isPlaying;
-
-    if (isPlaying && !wasPlaying) {
-      // Playback just started — clear any previous colouring and re-render clean
-      if (styledBeatsRef.current.size > 0) {
-        clearNoteColors();
-        apiRef.current?.render();
-      }
-    } else if (!isPlaying && wasPlaying) {
-      // Playback just stopped — apply note colours and re-render
-      if (noteEvaluationsRef.current.length > 0) {
-        applyNoteColors();
-        apiRef.current?.render();
-      }
-    }
-  }, [isPlaying, applyNoteColors, clearNoteColors]);
-
   // ── Playback actions ────────────────────────────
   const playPause = useCallback(() => {
     apiRef.current?.playPause();
@@ -661,13 +492,6 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     },
     [],
   );
-
-  const toggleMute = useCallback(() => {
-    if (!apiRef.current) return;
-    const next = !isMuted;
-    apiRef.current.masterVolume = next ? 0 : 1;
-    setIsMuted(next);
-  }, [isMuted]);
 
   // ── Stave profile (notation display) ─────────────
   const STAVE_PROFILE_MAP: Record<StaveProfile, AlphaTabStaveProfile> = {
@@ -866,143 +690,6 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
 
           />
 
-          {/* Mic / Speaker section */}
-          {onToggleMic && (
-            <>
-              {/* Mute playback */}
-              <button
-                onClick={toggleMute}
-                disabled={!playerReady}
-                className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 ${
-                  isMuted
-                    ? 'bg-destructive/10 text-destructive'
-                    : 'text-muted-foreground hover:bg-secondary'
-                }`}
-                title={isMuted ? 'Unmute playback' : 'Mute playback'}
-                aria-label={isMuted ? 'Unmute playback' : 'Mute playback'}
-                aria-pressed={isMuted}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  {isMuted ? (
-                    <>
-                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                      <line x1="23" y1="9" x2="17" y2="15" />
-                      <line x1="17" y1="9" x2="23" y2="15" />
-                    </>
-                  ) : (
-                    <>
-                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                      <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-                      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                    </>
-                  )}
-                </svg>
-              </button>
-
-              {/* Mic toggle */}
-              <button
-                onClick={onToggleMic}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  isListening
-                    ? 'bg-emerald-500/10 text-emerald-500'
-                    : 'text-muted-foreground hover:bg-secondary'
-                }`}
-                title={isListening ? 'Stop listening' : 'Start listening'}
-                aria-label={isListening ? 'Stop listening' : 'Start listening'}
-                aria-pressed={isListening}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  {isListening ? (
-                    <>
-                      <line x1="1" y1="1" x2="23" y2="23" />
-                      <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
-                      <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2c0 .76-.13 1.49-.35 2.17" />
-                      <line x1="12" y1="19" x2="12" y2="23" />
-                      <line x1="8" y1="23" x2="16" y2="23" />
-                    </>
-                  ) : (
-                    <>
-                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                      <line x1="12" y1="19" x2="12" y2="23" />
-                      <line x1="8" y1="23" x2="16" y2="23" />
-                    </>
-                  )}
-                </svg>
-              </button>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button
-                    className="p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                    title="Mic settings"
-                    aria-label="Mic settings"
-                  >
-                    <ChevronDown size={12} className="opacity-50" aria-hidden="true" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-56 p-4" align="end" sideOffset={8}>
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-foreground">Mic Settings</h4>
-
-                    {/* Latency compensation */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-xs text-foreground">Latency</Label>
-                        <span className="text-xs font-mono text-muted-foreground tabular-nums w-10 text-right">
-                          {latencyMs} ms
-                        </span>
-                      </div>
-                      <Slider
-                        min={0}
-                        max={200}
-                        step={5}
-                        value={[latencyMs]}
-                        onValueChange={([v]) => onLatencyChange?.(v)}
-                        aria-label="Input latency"
-                      />
-                      <p className="text-[10px] text-muted-foreground">
-                        Compensate for hardware input delay
-                      </p>
-                    </div>
-
-                    {/* Demo mode */}
-                    {onToggleDemo && (
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-xs text-foreground">Demo mode</Label>
-                          <p className="text-[10px] text-muted-foreground">Simulate mic input</p>
-                        </div>
-                        <button
-                          onClick={onToggleDemo}
-                          className={`relative w-9 h-5 rounded-full transition-colors ${
-                            demoMode ? 'bg-violet-500' : 'bg-muted'
-                          }`}
-                          aria-label="Toggle demo mode"
-                          role="switch"
-                          aria-checked={demoMode}
-                        >
-                          <span
-                            className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                              demoMode ? 'translate-x-4' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Tuner */}
-                      <div className="pt-2">
-                      </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-              {/* Note detection — right of mic toggle */}
-              {isListening && currentPitch && (
-                <MicFeedbackDisplay currentPitch={currentPitch} />
-              )}
-            </>
-          )}
-
           {/* Separator */}
           <div className="w-px h-6 bg-border" role="presentation" />
 
@@ -1192,12 +879,6 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
 
         <div className="relative">
           <div ref={containerRef} className="at-main" />
-          {noteEvaluations.length > 0 && beatBoundsMap.size > 0 && (
-            <NoteEvaluationOverlay
-              evaluations={noteEvaluations}
-              beatBoundsMap={beatBoundsMap}
-            />
-          )}
         </div>
       </div>
 

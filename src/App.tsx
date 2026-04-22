@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { Activity, Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Keyboard, RotateCcw, Info, AudioLines, FolderTree, Search, X } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Keyboard, Info, AudioLines, FolderTree, Search, X } from 'lucide-react';
 import MetronomeIcon from './components/MetronomeIcon';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { PortalContainerContext } from '@/components/ui/portal-container';
@@ -10,27 +10,20 @@ import {
 } from '@/components/ui/popover';
 import AlphaTabView from './components/AlphaTabView';
 import type { AlphaTabHandle } from './components/AlphaTabView';
-import ExercisePicker from './components/ExercisePicker';
-import PostExerciseSummary from './components/PostExerciseSummary';
 import WelcomeModal from './components/WelcomeModal';
 import TunerPage from './components/TunerPage';
 import MetronomePage, { type MetronomeHandle } from './components/MetronomePage';
 import ExerciseDirectoryTree from './components/ExerciseDirectoryTree';
-import { exercises, type Exercise } from './data/exercises';
+import type { Exercise } from './types';
 import { useAudioInput } from './hooks/useAudioInput';
-import { useDemoMode } from './hooks/useDemoMode';
-import { useProgress } from './hooks/useProgress';
-import { useEvaluation } from './hooks/useEvaluation';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import type { TimedNote } from './audio/noteExtractor';
 import type { MetronomeConfig } from './components/MetronomeSettings';
 import { useExerciseDirectory } from './features/exerciseDirectory/useExerciseDirectory.ts';
 import './components/alphatab.css';
 
-type AppView = 'directory' | 'trainer' | 'tuner' | 'metronome';
+type AppView = 'directory' | 'tuner' | 'metronome';
 
-const VIEWS: AppView[] = ['directory', 'trainer', 'tuner', 'metronome'];
-const LAST_TRAINER_EXERCISE_KEY = 'groovetrainer:lastOpenedTrainerExerciseId';
+const VIEWS: AppView[] = ['directory', 'tuner', 'metronome'];
 const METRONOME_CONFIG_LS_KEY = 'groovetrainer:metronomeConfig';
 
 function viewFromHash(): AppView {
@@ -51,19 +44,13 @@ function App() {
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
-  const [currentExercise, setCurrentExercise] = useState<Exercise | null>(() => {
-    const id = localStorage.getItem(LAST_TRAINER_EXERCISE_KEY);
-    return exercises.find((exercise) => exercise.id === id) ?? null;
-  });
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [dirSearchOpen, setDirSearchOpen] = useState(false);
   const [dirSearchQuery, setDirSearchQuery] = useState('');
-  const [noteData, setNoteData] = useState<TimedNote[]>([]);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const scorePositionRef = useRef(0);
   const directory = useExerciseDirectory();
 
-  const directoryExercise = directory.selectedFile
+  const directoryExercise: Exercise | null = directory.selectedFile
     ? {
         id: `directory:${directory.selectedFile.id}`,
         title: directory.selectedFile.name,
@@ -75,13 +62,7 @@ function App() {
       }
     : null;
 
-  useEffect(() => {
-    if (currentExercise) {
-      localStorage.setItem(LAST_TRAINER_EXERCISE_KEY, currentExercise.id);
-    }
-  }, [currentExercise]);
-
-  // Metronome config — lifted here so evaluation can read count-in state
+  // Metronome config — lifted here so it persists across view changes
   const [metronomeConfig, setMetronomeConfig] = useState<MetronomeConfig>(() => {
     try {
       const saved = localStorage.getItem(METRONOME_CONFIG_LS_KEY);
@@ -117,86 +98,8 @@ function App() {
   const alphaTabRef = useRef<AlphaTabHandle>(null);
   // Metronome page imperative ref (for keyboard shortcuts)
   const metronomeRef = useRef<MetronomeHandle>(null);
-  const progress = useProgress();
 
   const audio = useAudioInput();
-
-  // Demo mode — simulate mic input for testing visual feedback without a bass
-  const [demoMode, setDemoMode] = useState(false);
-  const demo = useDemoMode({
-    expectedNotes: noteData,
-    isPlaying,
-    enabled: demoMode,
-    scorePositionRef,
-  });
-
-  // Effective audio signals: demo overrides real mic when active
-  const effectiveListening = demoMode || audio.isListening;
-  const effectiveLastNote = demoMode ? demo.lastNote : audio.lastNote;
-  const effectivePitch = demoMode ? demo.currentPitch : audio.currentPitch;
-
-  // Callbacks for AlphaTabView (stable refs — no re-renders)
-  const handlePlayStateChange = useCallback((playing: boolean) => {
-    setIsPlaying(playing);
-  }, []);
-
-  const handlePositionChange = useCallback((ms: number) => {
-    scorePositionRef.current = ms;
-  }, []);
-
-  const evaluation = useEvaluation({
-    expectedNotes: noteData,
-    isPlaying,
-    isListening: effectiveListening,
-    evaluationEnabled: currentView === 'trainer',
-    lastDetectedNote: effectiveLastNote,
-    scorePositionRef,
-  });
-
-  // Snapshot the best score before this run so PostExerciseSummary can compare against it.
-  // Intentionally not depending on progressData — we want the value at the moment summary first
-  // appears, before saveProgress updates the store.
-  const previousBest = useMemo(
-    () => (evaluation.summary && currentExercise
-      ? (progress.progressData[currentExercise.id]?.bestScore ?? null)
-      : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [evaluation.summary, currentExercise?.id],
-  );
-
-  // Save progress when an evaluation finishes
-  useEffect(() => {
-    if (currentView === 'trainer' && evaluation.summary && currentExercise) {
-      const bestScoreBpm = alphaTabRef.current?.getTempo() ?? 0;
-      progress.saveProgress({
-        exerciseId: currentExercise.id,
-        bestScore: evaluation.summary.accuracy,
-        bestTimingScore: evaluation.summary.grooveLock,
-        bestPitchScore: evaluation.summary.pitchAccuracy,
-        bestScoreBpm,
-        highestBpm: bestScoreBpm,
-        lastPlayedAt: new Date().toISOString(),
-      });
-    }
-  }, [currentView, evaluation.summary, currentExercise, progress]);
-
-  // ── Next exercise (if available) ───────────────────
-  const currentIndex = currentExercise ? exercises.findIndex((e) => e.id === currentExercise.id) : -1;
-  const nextExercise = currentIndex >= 0 && currentIndex < exercises.length - 1 ? exercises[currentIndex + 1] : null;
-
-  const handleRetry = useCallback(() => {
-    evaluation.dismissSummary();
-    // Stop then play again after a tick so AlphaTab resets position
-    alphaTabRef.current?.stop();
-    setTimeout(() => alphaTabRef.current?.playPause(), 50);
-  }, [evaluation]);
-
-  const handleNextExercise = useCallback(() => {
-    if (nextExercise) {
-      evaluation.dismissSummary();
-      setCurrentExercise(nextExercise);
-    }
-  }, [nextExercise, evaluation]);
 
   // ── Keyboard shortcuts ────────────────────────────
   useKeyboardShortcuts({
@@ -240,7 +143,7 @@ function App() {
         <header className="bg-zinc-700 border-b border-border py-4 px-6 flex items-center justify-between relative z-10">
           <div className="flex items-center gap-3 flex-1">
             <div className="bg-primary text-primary-foreground p-2 rounded-lg">
-              <Activity size={24} />
+              <FolderTree size={24} />
             </div>
             <h1 className="text-xl font-bold text-zinc-100 tracking-tight">
               Bass Trainer
@@ -260,18 +163,6 @@ function App() {
             >
               <FolderTree size={24} />
               <span className="text-xs font-medium">Directory</span>
-            </button>
-            <button
-              onClick={() => navigateTo('trainer')}
-              className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors ${
-                currentView === 'trainer'
-                  ? 'bg-white/15 text-zinc-100'
-                  : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/10'
-              }`}
-              title="Groove Trainer"
-            >
-              <Activity size={24} />
-              <span className="text-xs font-medium">Trainer</span>
             </button>
             <button
               onClick={() => navigateTo('tuner')}
@@ -455,9 +346,6 @@ function App() {
                     sidebarWidth={sidebarOpen ? 288 : 52}
                     metronomeConfig={metronomeConfig}
                     onMetronomeConfigChange={setMetronomeConfig}
-                    onNoteDataExtracted={(notes) => setNoteData(notes)}
-                    onPlayStateChange={handlePlayStateChange}
-                    onPositionChange={handlePositionChange}
                   />
                 ) : (
                   <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground animate-in fade-in zoom-in-95 duration-300">
@@ -482,107 +370,6 @@ function App() {
             </>
           )}
 
-          {/* Trainer View */}
-          {currentView === 'trainer' && (
-            <>
-              {/* Exercise Picker Sidebar — flush left */}
-              {sidebarOpen ? (
-                <>
-                  {/* Overlay for mobile (hidden on desktop) */}
-                  <div 
-                    className="sm:hidden fixed inset-0 bg-black/50 z-30 animate-in fade-in"
-                    onClick={() => setSidebarOpen(false)}
-                    aria-hidden="true"
-                  />
-                  <aside className="w-full sm:w-64 shrink-0 bg-zinc-700 border-r border-border flex flex-col overflow-hidden absolute inset-0 z-40 sm:relative sm:inset-auto shadow-2xl sm:shadow-none animate-in slide-in-from-left duration-200">
-                    <div className="flex items-center justify-between px-3 pt-3 pb-2 shrink-0 border-b border-white/10 sm:border-none">
-                      <h3 className="font-semibold text-zinc-200 text-sm">Exercises</h3>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => {
-                            if (confirm('Are you sure you want to reset all progress?')) {
-                              progress.clearProgress();
-                            }
-                          }}
-                          className="p-1 text-zinc-400 hover:text-rose-400 hover:bg-white/10 rounded transition-colors"
-                          title="Reset all progress"
-                        >
-                          <RotateCcw size={16} />
-                        </button>
-                        <button
-                          onClick={() => setSidebarOpen(false)}
-                          className="p-1 text-zinc-400 hover:text-zinc-100 hover:bg-white/10 rounded transition-colors"
-                          title="Collapse sidebar"
-                        >
-                          <PanelLeftClose size={16} />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex-1 overflow-y-auto px-2 pb-2 scrollbar-autohide">
-                      <ExercisePicker
-                        exercises={exercises}
-                        currentId={currentExercise?.id}
-                        progressData={progress.progressData}
-                        onSelect={(ex) => setCurrentExercise(ex)}
-                      />
-                    </div>
-                  </aside>
-                </>
-              ) : (
-                <button
-                  onClick={() => setSidebarOpen(true)}
-                  className="shrink-0 self-start m-2 p-2 bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors rounded-lg"
-                  title="Show exercises"
-                >
-                  <PanelLeftOpen size={20} />
-                </button>
-              )}
-
-              {/* Center: Practice Area */}
-              <section className="flex-1 flex flex-col bg-card min-h-0 min-w-0">
-                {currentExercise ? (
-                  <AlphaTabView
-                    ref={alphaTabRef}
-                    key={currentExercise.id}
-                    exercise={currentExercise}
-                    sidebarWidth={sidebarOpen ? 256 : 52}
-                    metronomeConfig={metronomeConfig}
-                    onMetronomeConfigChange={setMetronomeConfig}
-                    onNoteDataExtracted={(notes) => setNoteData(notes)}
-                    onPlayStateChange={handlePlayStateChange}
-                    onPositionChange={handlePositionChange}
-                    isListening={effectiveListening}
-                    currentPitch={effectivePitch}
-                    onToggleMic={audio.toggle}
-                    latencyMs={evaluation.latencyMs}
-                    onLatencyChange={evaluation.changeLatency}
-                    noteEvaluations={evaluation.evaluations}
-                    demoMode={demoMode}
-                    onToggleDemo={() => setDemoMode(d => !d)}
-                  />
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground animate-in fade-in zoom-in-95 duration-300">
-                    <div className="bg-muted p-6 rounded-full mb-6">
-                      <Activity size={48} className="text-primary/50" />
-                    </div>
-                    <h2 className="text-2xl font-semibold text-foreground mb-3">Welcome to Bass Trainer</h2>
-                    <p className="max-w-md text-sm leading-relaxed">
-                      Select an exercise from the sidebar to start practicing your bass skills.
-                    </p>
-                    {!sidebarOpen && (
-                      <button
-                        onClick={() => setSidebarOpen(true)}
-                        className="mt-8 px-6 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors font-medium"
-                      >
-                        Open Exercises
-                      </button>
-                    )}
-                  </div>
-                )}
-              </section>
-            </>
-          )}
-
           {/* Tuner View */}
           {currentView === 'tuner' && (
             <TunerPage
@@ -598,18 +385,6 @@ function App() {
             <MetronomePage ref={metronomeRef} />
           )}
         </div>
-
-        {/* Post-exercise summary overlay */}
-        {currentView === 'trainer' && evaluation.summary && currentExercise && (
-          <PostExerciseSummary
-            summary={evaluation.summary}
-            exerciseTitle={currentExercise.title}
-            personalBest={previousBest}
-            onDismiss={evaluation.dismissSummary}
-            onRetry={handleRetry}
-            onNextExercise={nextExercise ? handleNextExercise : null}
-          />
-        )}
 
         {/* Welcome Modal Splash Screen */}
         <WelcomeModal isOpen={showWelcome} onClose={handleCloseWelcome} />

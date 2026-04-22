@@ -1,11 +1,11 @@
 /**
- * useAudioInput – React hook for microphone-based pitch & onset detection.
+ * useAudioInput – React hook for microphone-based pitch detection.
  *
  * Wraps AudioAnalyser in React lifecycle with clean start/stop semantics.
  */
 
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { AudioAnalyser, type DetectedNote } from '../audio/audioAnalyser';
+import { AudioAnalyser } from '../audio/audioAnalyser';
 import type { PitchResult } from '../audio/pitchDetector';
 
 export interface AudioInputState {
@@ -13,16 +13,8 @@ export interface AudioInputState {
   isListening: boolean;
   /** Most recent pitch detection result (updated ~60fps). */
   currentPitch: PitchResult;
-  /** All notes detected since listening started. */
-  detectedNotes: DetectedNote[];
-  /** The last detected note (handy for UI display). */
-  lastNote: DetectedNote | null;
   /** Start microphone capture and analysis. */
   start: () => Promise<void>;
-  /** Stop capture and analysis. */
-  stop: () => void;
-  /** Toggle start/stop. */
-  toggle: () => Promise<void>;
   /** Error message if mic access failed. */
   error: string | null;
 }
@@ -36,8 +28,6 @@ export function useAudioInput(): AudioInputState {
     noteName: null,
     rms: 0,
   });
-  const [detectedNotes, setDetectedNotes] = useState<DetectedNote[]>([]);
-  const [lastNote, setLastNote] = useState<DetectedNote | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const start = useCallback(async () => {
@@ -47,10 +37,6 @@ export function useAudioInput(): AudioInputState {
       const analyser = new AudioAnalyser({
         onPitch: (pitch) => {
           setCurrentPitch(pitch);
-        },
-        onNote: (note) => {
-          setLastNote(note);
-          setDetectedNotes((prev) => [...prev, note]);
         },
       });
 
@@ -67,20 +53,6 @@ export function useAudioInput(): AudioInputState {
     }
   }, []);
 
-  const stop = useCallback(() => {
-    analyserRef.current?.stop();
-    analyserRef.current = null;
-    setIsListening(false);
-  }, []);
-
-  const toggle = useCallback(async () => {
-    if (isListening) {
-      stop();
-    } else {
-      await start();
-    }
-  }, [isListening, start, stop]);
-
   // Clean up on unmount
   useEffect(() => {
     return () => {
@@ -92,11 +64,7 @@ export function useAudioInput(): AudioInputState {
   return {
     isListening,
     currentPitch,
-    detectedNotes,
-    lastNote,
     start,
-    stop,
-    toggle,
     error,
   };
 }
