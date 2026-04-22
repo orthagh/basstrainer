@@ -143,6 +143,8 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
 
   const activeVolumeTimeoutRef = useRef<number | null>(null);
   const dragStartBeatRef = useRef<InstanceType<typeof model.Beat> | null>(null);
+  const renderFinishedRef = useRef(false);
+  const playerReadyRef = useRef(false);
 
   // Initialise AlphaTab
   useEffect(() => {
@@ -151,6 +153,8 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     setIsPlaying(false);
     setIsLoading(true);
     setPlayerReady(false);
+    renderFinishedRef.current = false;
+    playerReadyRef.current = false;
     setCurrentTime(0);
     setEndTime(0);
     setScoreDurationMs(0);
@@ -164,7 +168,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     const api = new AlphaTabApi(containerRef.current, {
       core: {
         fontDirectory: import.meta.env.BASE_URL + 'font/',
-        tex: true,
+        tex: !!exercise.tex,
       },
       display: {
         staveProfile: 'Default',  // Standard notation + tab
@@ -179,7 +183,6 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
         enableCursor: true,
         enableUserInteraction: true,
         soundFont: import.meta.env.BASE_URL + 'soundfont/musescore-general.sf3',
-        outputMode: 1, // WebAudioScriptProcessor — bypass AudioWorklet (Vite 8 compat)
         scrollElement: viewportRef.current!,
         scrollOffsetX: -30,
         scrollOffsetY: -30,
@@ -243,12 +246,19 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
 
     api.renderStarted.on(() => setIsLoading(true));
     api.renderFinished.on(() => {
-      setIsLoading(false);
+      renderFinishedRef.current = true;
       viewportRef.current?.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      if (playerReadyRef.current) {
+        setIsLoading(false);
+      }
     });
 
     api.playerReady.on(() => {
+      playerReadyRef.current = true;
       setPlayerReady(true);
+      if (renderFinishedRef.current) {
+        setIsLoading(false);
+      }
       onReady?.();
       // For GP files, read the actual tempo from the score instead of the placeholder.
       if (exercise.filePath && api.score) {
