@@ -1,4 +1,4 @@
-import { Activity, Crosshair, FolderOpen, Mic, Music, Play } from 'lucide-react';
+import { FolderOpen, Music, Play } from 'lucide-react';
 
 interface WelcomeModalProps {
   isOpen: boolean;
@@ -14,7 +14,7 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
         <div className="p-6 sm:p-8">
           <div className="flex justify-center mb-6">
             <div className="bg-primary text-primary-foreground p-4 rounded-full shadow-lg">
-              <Activity size={40} />
+              <Music size={40} />
             </div>
           </div>
 
@@ -22,7 +22,7 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
             Bass Groove Trainer
           </h2>
           <p className="text-center text-muted-foreground mb-8 text-sm">
-            A personal practice tool for bass — play along with tablature, get timing feedback, and track your progress.
+            A personal practice tool for bass — browse your Guitar Pro files, play along with tablature, and use the built-in tuner and metronome.
           </p>
 
           <div className="space-y-4 mb-8">
@@ -31,22 +31,6 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
               <div>
                 <h3 className="font-semibold text-foreground text-sm">Your GP files</h3>
                 <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Drop Guitar Pro files into <code className="text-xs bg-muted px-1 rounded">repository-exercises/</code> and they appear in the directory browser, loaded directly — no conversion step.</p>
-              </div>
-            </div>
-
-            <div className="flex gap-4 items-start">
-              <div className="bg-muted p-2 rounded-lg text-foreground shrink-0"><Mic size={20} /></div>
-              <div>
-                <h3 className="font-semibold text-foreground text-sm">Real-time feedback</h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Play along with your microphone. The app analyses your timing and pitch in the browser as you play.</p>
-              </div>
-            </div>
-
-            <div className="flex gap-4 items-start">
-              <div className="bg-muted p-2 rounded-lg text-foreground shrink-0"><Crosshair size={20} /></div>
-              <div>
-                <h3 className="font-semibold text-foreground text-sm">Groove Lock score</h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Post-exercise summary showing timing consistency, whether you rush or drag, and your best scores across sessions.</p>
               </div>
             </div>
 
