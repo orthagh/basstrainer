@@ -78,6 +78,11 @@ function App() {
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
+  const [mainEl, setMainEl] = useState<HTMLDivElement | null>(null);
+  const mainCallbackRef = useCallback((el: HTMLDivElement | null) => {
+    mainRef.current = el;
+    setMainEl(el);
+  }, []);
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -136,9 +141,9 @@ function App() {
   }, []);
 
   return (
-    <PortalContainerContext.Provider value={isFullscreen ? mainRef.current : null}>
+    <PortalContainerContext.Provider value={isFullscreen ? mainEl : null}>
     <TooltipProvider>
-      <div ref={mainRef} className="h-screen bg-background flex flex-col overflow-hidden">
+      <div ref={mainCallbackRef} className="h-screen bg-background flex flex-col overflow-hidden">
         {/* Header with Navigation */}
         <header className="bg-zinc-700 border-b border-border py-4 px-6 flex items-center justify-between relative z-10">
           <div className="flex items-center gap-3 flex-1">
