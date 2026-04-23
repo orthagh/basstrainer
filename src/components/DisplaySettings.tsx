@@ -6,13 +6,14 @@
  */
 
 import { useCallback } from 'react';
+import type { ReactNode } from 'react';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
-import { SlidersHorizontal } from 'lucide-react';
+import { AlignLeft, Moon, Music, SlidersHorizontal } from 'lucide-react';
 import { staveProfileToToggles, togglesToStaveProfile, STAVE_PROFILE_LS_KEY, type StaveProfile } from '@/lib/displaySettings';
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -20,12 +21,16 @@ import { staveProfileToToggles, togglesToStaveProfile, STAVE_PROFILE_LS_KEY, typ
 interface DisplaySettingsProps {
   staveProfile: StaveProfile;
   onChange: (profile: StaveProfile) => void;
+  scoreDark: boolean;
+  onScoreDarkChange: (v: boolean) => void;
   disabled?: boolean;
 }
 
 export default function DisplaySettings({
   staveProfile,
   onChange,
+  scoreDark,
+  onScoreDarkChange,
   disabled = false,
 }: DisplaySettingsProps) {
   const { showStandard, showTab } = staveProfileToToggles(staveProfile);
@@ -63,21 +68,39 @@ export default function DisplaySettings({
           <Separator />
 
           {/* Notation toggles */}
-          <div className="space-y-1">
+          <div>
             <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
               Notation
             </p>
             <NotationRow
+              icon={<Music size={13} />}
               label="Standard"
               description="Sheet music"
               checked={showStandard}
               onChange={(v) => toggle('showStandard', v)}
             />
             <NotationRow
+              icon={<AlignLeft size={13} />}
               label="Tab"
               description="Guitar tablature"
               checked={showTab}
               onChange={(v) => toggle('showTab', v)}
+            />
+          </div>
+
+          <Separator />
+
+          {/* Appearance toggles */}
+          <div>
+            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-2">
+              Appearance
+            </p>
+            <NotationRow
+              icon={<Moon size={13} />}
+              label="Dark score"
+              description="Invert notation colours"
+              checked={scoreDark}
+              onChange={onScoreDarkChange}
             />
           </div>
         </div>
@@ -89,13 +112,14 @@ export default function DisplaySettings({
 // ── NotationRow ───────────────────────────────────────────────────────────────
 
 interface NotationRowProps {
+  icon: ReactNode;
   label: string;
   description: string;
   checked: boolean;
   onChange: (next: boolean) => void;
 }
 
-function NotationRow({ label, description, checked, onChange }: NotationRowProps) {
+function NotationRow({ icon, label, description, checked, onChange }: NotationRowProps) {
   return (
     <button
       onClick={() => onChange(!checked)}
@@ -103,9 +127,12 @@ function NotationRow({ label, description, checked, onChange }: NotationRowProps
         checked ? 'bg-primary/10 text-primary' : 'hover:bg-muted text-foreground'
       }`}
     >
-      <div className="text-left">
-        <div className="text-xs font-medium">{label}</div>
-        <div className="text-[10px] text-muted-foreground mt-0.5">{description}</div>
+      <div className="flex items-center gap-2.5 text-left">
+        <span className="shrink-0 opacity-70">{icon}</span>
+        <div>
+          <div className="text-xs font-medium">{label}</div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">{description}</div>
+        </div>
       </div>
       {/* Simple pill indicator */}
       <div

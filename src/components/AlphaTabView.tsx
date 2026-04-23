@@ -12,6 +12,8 @@ import { buildTempoMap, tickToMs } from '../audio/noteExtractor';
 import MetronomeSettings, { type MetronomeConfig } from './MetronomeSettings';
 import DisplaySettings from './DisplaySettings';
 import { loadStaveProfile, type StaveProfile } from '@/lib/displaySettings';
+
+const SCORE_DARK_LS_KEY = 'groovetrainer:scoreDark';
 import BpmDisplay from './BpmDisplay';
 import { Slider } from '@/components/ui/slider';
 import { ChevronRight } from 'lucide-react';
@@ -129,6 +131,10 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
   const [endTime, setEndTime] = useState(0);
   const [scoreDurationMs, setScoreDurationMs] = useState(0);
   const [staveProfile, setStaveProfile] = useState<StaveProfile>(() => loadStaveProfile());
+  const [scoreDark, setScoreDark] = useState<boolean>(() => {
+    const stored = localStorage.getItem(SCORE_DARK_LS_KEY);
+    return stored === null ? true : stored === 'true';
+  });
   const [sections, setSections] = useState<SectionMarker[]>([]);
 
   const [isLooping, setIsLooping] = useState(false);
@@ -611,9 +617,9 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
   };
 
   return (
-    <div className="flex flex-col h-full bg-card min-h-0">
+    <div className="flex flex-col h-full bg-zinc-900 min-h-0">
       {/* Top bar */}
-      <div className="border-b border-border grid grid-cols-[1fr_auto_1fr] h-14 overflow-visible relative z-20" role="toolbar" aria-label="Playback Controls">
+      <div className="bg-zinc-900 border-b border-zinc-800 grid grid-cols-[1fr_auto_1fr] h-14 overflow-visible relative z-20" role="toolbar" aria-label="Playback Controls">
 
         {/* ── Far left: Tracks / Mixer toggle ── */}
         <div className="flex items-stretch">
@@ -621,7 +627,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
             <button
               onClick={() => setIsTracksPanelOpen((v) => !v)}
               disabled={!playerReady}
-              className="h-full px-4 bg-secondary hover:bg-secondary/80 text-secondary-foreground border-r border-border disabled:opacity-40 inline-flex items-center gap-2 shrink-0 transition-colors"
+              className={`my-auto ml-3 px-3 h-8 rounded-lg disabled:opacity-40 inline-flex items-center gap-2 shrink-0 transition-colors text-sm ${isTracksPanelOpen ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700'}`}
               title="Track selection and mixer"
               aria-label="Track selection and mixer"
               aria-expanded={isTracksPanelOpen}
@@ -650,7 +656,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
           <button
             onClick={stop}
             disabled={!playerReady}
-            className="h-9 px-3 rounded-l-lg border border-r-0 border-border bg-secondary text-secondary-foreground hover:bg-secondary/70 disabled:opacity-40 transition-colors shrink-0 translate-x-1"
+            className="h-9 px-3 rounded-l-lg border border-r-0 border-zinc-600 bg-zinc-700 text-zinc-200 hover:bg-zinc-600 disabled:opacity-40 transition-colors shrink-0 translate-x-1"
             title="Return to start (Escape)"
             aria-label="Return to start"
           >
@@ -665,7 +671,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
             <button
               onClick={playPause}
               disabled={!playerReady}
-              className="absolute top-1/2 -translate-y-1/2 bg-primary hover:brightness-110 disabled:bg-muted text-primary-foreground w-[4.5rem] h-[4.5rem] rounded-full transition-all flex items-center justify-center z-20 shadow-md"
+              className="absolute top-1/2 -translate-y-1/2 bg-primary hover:brightness-110 disabled:bg-zinc-700 text-primary-foreground w-[4.5rem] h-[4.5rem] rounded-full transition-all flex items-center justify-center z-20 shadow-md"
               title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
               aria-label={isPlaying ? 'Pause' : 'Play'}
               aria-pressed={isPlaying}
@@ -701,7 +707,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
           />
 
           {/* Separator */}
-          <div className="w-px h-6 bg-border" role="presentation" />
+          <div className="w-px h-6 bg-zinc-700" role="presentation" />
 
           {/* Loop */}
           <button
@@ -710,7 +716,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
             className={`h-8 w-8 flex items-center justify-center rounded-lg transition-colors disabled:opacity-40 ${
               isLooping
                 ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-secondary'
+                : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700'
             }`}
             title="Toggle loop (L)"
             aria-label="Toggle loop"
@@ -735,6 +741,11 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
           <DisplaySettings
             staveProfile={staveProfile}
             onChange={setStaveProfile}
+            scoreDark={scoreDark}
+            onScoreDarkChange={(v) => {
+              setScoreDark(v);
+              localStorage.setItem(SCORE_DARK_LS_KEY, String(v));
+            }}
             disabled={!playerReady}
           />
         </div>
@@ -746,7 +757,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
         {/* Sliding tracks panel */}
         {availableTracks.length > 1 && (
           <div
-            className={`shrink-0 overflow-hidden border-r border-border bg-secondary transition-[width] duration-200 ease-in-out relative z-10 ${isTracksPanelOpen ? 'w-72' : 'w-0'}`}
+            className={`shrink-0 overflow-hidden bg-zinc-900 border-r border-zinc-800 transition-[width] duration-200 ease-in-out relative z-10 ${isTracksPanelOpen ? 'w-72' : 'w-0'}`}
           >
             <div className="w-72 h-full overflow-y-auto">
               <div className="divide-y divide-border">
@@ -759,7 +770,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
                     <div
                       key={`track-${track.index}`}
                       className={`flex items-stretch gap-3 px-3 py-3 cursor-pointer select-none transition-colors ${
-                        isSelected ? 'bg-primary/10' : 'hover:bg-muted/60'
+                        isSelected ? 'bg-primary/10' : 'hover:bg-zinc-800/80'
                       }`}
                       role="button"
                       tabIndex={0}
@@ -774,14 +785,14 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
                       aria-pressed={isSelected}
                     >
                       {/* Icon — full height, centered */}
-                      <span className={`flex items-center justify-center shrink-0 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`}>
+                      <span className={`flex items-center justify-center shrink-0 ${isSelected ? 'text-primary/80' : 'text-zinc-500'}`}>
                         <InstrumentIcon label={getTrackLabel(track)} size={24} />
                       </span>
 
                       {/* Right column: title top, controls bottom */}
                       <div className="flex flex-col flex-1 min-w-0 gap-2.5">
                         {/* Track name */}
-                        <span className={`text-xs font-semibold truncate leading-none ${isSelected ? 'text-primary' : 'text-foreground'}`}>
+                        <span className={`text-xs font-semibold truncate leading-none ${isSelected ? 'text-zinc-100' : 'text-zinc-400'}`}>
                           {getTrackLabel(track)}
                         </span>
 
@@ -809,7 +820,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
                             <button
                               onClick={() => toggleTrackMute(track.index)}
                               className={`h-6 w-6 rounded inline-flex items-center justify-center transition-colors ${
-                                isMutedTrack ? 'bg-destructive/10 text-destructive' : 'bg-white text-muted-foreground hover:text-foreground'
+                                isMutedTrack ? 'bg-destructive/10 text-destructive' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-100'
                               }`}
                               aria-label={isMutedTrack ? `Unmute ${getTrackLabel(track)}` : `Mute ${getTrackLabel(track)}`}
                               aria-pressed={isMutedTrack}
@@ -820,7 +831,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
                             <button
                               onClick={() => toggleTrackSolo(track.index)}
                               className={`h-6 w-6 rounded inline-flex items-center justify-center transition-colors ${
-                                isSoloTrack ? 'bg-yellow-400 text-yellow-900' : 'bg-white text-muted-foreground hover:text-foreground'
+                                isSoloTrack ? 'bg-yellow-400 text-yellow-900' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-100'
                               }`}
                               aria-label={isSoloTrack ? `Disable solo for ${getTrackLabel(track)}` : `Solo ${getTrackLabel(track)}`}
                               aria-pressed={isSoloTrack}
@@ -876,10 +887,10 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
         {/* AlphaTab rendering viewport */}
         <div
           ref={viewportRef}
-          className="flex-1 overflow-y-auto min-w-0 relative isolate scrollbar-autohide"
+          className={`flex-1 overflow-y-auto min-w-0 relative isolate scrollbar-autohide transition-colors duration-200 ${scoreDark ? 'bg-zinc-900' : 'bg-white'}`}
         >
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-card/80 z-10">
+          <div className={`absolute inset-0 flex items-center justify-center z-10 ${scoreDark ? 'bg-zinc-900/80' : 'bg-white/80'}`}>
             <div className="flex flex-col items-center gap-2">
               <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
               <p className="text-sm text-muted-foreground">Loading…</p>
@@ -888,13 +899,13 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
         )}
 
         <div className="relative">
-          <div ref={containerRef} className="at-main" />
+          <div ref={containerRef} className={`at-main${scoreDark ? ' at-dark' : ''}`} />
         </div>
       </div>
 
         {/* Progress bar — pinned at bottom */}
         <div
-          className="shrink-0 flex items-stretch border-t border-border"
+          className="shrink-0 flex items-stretch border-t border-zinc-700"
           style={{ height: sections.length > 0 ? '2.5rem' : '1.25rem' }}
           role="progressbar"
           aria-label="Playback progress"
@@ -903,7 +914,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
           aria-valuenow={endTime > 0 ? Math.round((currentTime / endTime) * 100) : 0}
         >
           {/* Timeline area */}
-          <div className="flex-1 relative overflow-hidden bg-muted/60">
+          <div className="flex-1 relative overflow-hidden bg-zinc-900">
             {/* Section bands */}
             {sections.length > 0 && sections.map((section, i) => {
               const duration = Math.max(endTime, scoreDurationMs);
@@ -913,7 +924,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
               return (
                 <button
                   key={i}
-                  className="absolute inset-y-0 flex items-center px-2 overflow-hidden border-r border-border/60 hover:brightness-110 transition-[filter] cursor-pointer"
+                  className="absolute inset-y-0 flex items-center px-2 overflow-hidden border-r border-zinc-700/60 hover:brightness-110 transition-[filter] cursor-pointer"
                   style={{
                     left: `${startPct}%`,
                     width: `${widthPct}%`,
@@ -945,7 +956,7 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
             />
           </div>
           {/* Timers — reserved right slot */}
-          <div className="shrink-0 w-28 flex items-center justify-end px-3 gap-0.5 border-l border-border/40">
+          <div className="shrink-0 w-28 flex items-center justify-end px-3 gap-0.5 border-l border-zinc-700/40">
             <span className="text-[10px] font-mono tabular-nums text-foreground" aria-live="off">{fmt(currentTime)}</span>
             <span className="text-[10px] text-muted-foreground/50 mx-0.5">/</span>
             <span className="text-[10px] font-mono tabular-nums text-muted-foreground">{fmt(endTime)}</span>

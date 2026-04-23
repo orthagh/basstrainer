@@ -1,18 +1,25 @@
-/* AlphaTab cursor / highlight styles — orange accent */
-/* Disabled .at-cursor-bar: interferes with loop selection overlay */
+/* AlphaTab dark theme — applied when .at-dark class is present on the container */
+.at-main.at-dark {
+  filter: invert(1) brightness(0.72);
+}
 
+/*
+ * Cursor / highlight colours are inside .at-main so they are also inverted.
+ * Pre-invert them here (complement of the amber accent #f5a623 = #0a59dc)
+ * so they render as the correct amber after the filter is applied.
+ */
 .at-selection div {
-  background: rgba(234, 120, 30, 0.15);
+  background: rgba(10, 89, 220, 0.21);  /* 0.15 / 0.72 */
 }
 
 .at-cursor-beat {
-  background: rgba(234, 120, 30, 0.75);
+  background: rgba(10, 89, 220, 1.0);   /* 0.75 / 0.72, clamped to 1 */
   width: 3px;
 }
 
 .at-highlight * {
-  fill: #ea781e;
-  stroke: #ea781e;
+  fill: #0a59dc;
+  stroke: #0a59dc;
 }
 
 /* Note evaluation feedback overlay */

@@ -198,7 +198,7 @@ export default function RhythmPicker({
       <div className="absolute right-0 top-1 h-11 flex items-center">
       <Select value={divSelectValue} onValueChange={handleDivisionChange}>
         <SelectTrigger
-          className="h-11 w-auto text-sm bg-muted border-0 rounded-lg px-4"
+          className="h-11 w-auto text-sm bg-zinc-700 border border-zinc-600 text-zinc-100 rounded-lg px-4"
           onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
         >
           <SelectValue />

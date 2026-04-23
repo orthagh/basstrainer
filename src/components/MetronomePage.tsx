@@ -68,12 +68,25 @@ const MetronomePage = forwardRef<MetronomeHandle>((_props, ref) => {
   );
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-start overflow-y-auto p-6 md:p-10 bg-gradient-to-br from-background to-muted/50 scrollbar-autohide">
+    <div className="dark flex-1 flex flex-col items-center justify-start overflow-y-auto p-6 md:p-10 bg-zinc-900 scrollbar-autohide">
       <div className="w-full max-w-md space-y-4">
 
+        {/* ── Welcome header — fades out while running ─────── */}
+        <div className={`mb-14 transition-opacity duration-300 ${m.isRunning ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+            <div className="inline-flex items-center gap-2 mb-4 px-3 py-1 rounded-full border border-zinc-700 bg-zinc-800 text-[10px] font-mono tracking-[0.2em] text-zinc-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary/70" />
+              METRONOME
+            </div>
+            <h2 className="text-4xl font-medium tracking-tight leading-[1.1] text-zinc-100 mb-3">
+              Keep the <span className="italic font-normal text-primary">beat</span>.
+            </h2>
+            <p className="text-sm leading-relaxed text-zinc-500 max-w-sm">
+              Set your tempo, pick a subdivision, and tap along — or use <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700 font-mono text-xs text-zinc-300">Space</kbd> to start.
+            </p>
+          </div>
         {/* ── Rhythm ────────────────────────────────────── */}
         <section
-          className="bg-card border border-border rounded-xl p-5"
+          className="p-0"
           aria-label="Rhythm pattern"
         >
           {/* Tempo row */}
@@ -100,7 +113,7 @@ const MetronomePage = forwardRef<MetronomeHandle>((_props, ref) => {
         </section>
 
         {/* ── Transport ─────────────────────────────────── */}
-        <div aria-label="Transport">
+        <div aria-label="Transport" className="pt-4">
           <div className="relative flex items-center justify-center gap-3">
 
             {/* Tap tempo — left */}
@@ -160,7 +173,7 @@ const MetronomePage = forwardRef<MetronomeHandle>((_props, ref) => {
         {/* ── Advanced (collapsible) ─────────────────────── */}
         <section className="overflow-hidden" aria-label="Advanced options">
           {advancedOpen && (
-            <div className="px-1 pb-3 space-y-5 pt-3">
+            <div className="space-y-5 pt-2">
 
               {/* Click sound */}
               <div className="space-y-2 pt-4">
@@ -172,7 +185,7 @@ const MetronomePage = forwardRef<MetronomeHandle>((_props, ref) => {
                     value={m.clickSound}
                     onValueChange={(v) => m.setClickSound(v as ClickSound)}
                   >
-                    <SelectTrigger className="h-9 text-sm flex-1">
+                    <SelectTrigger className="h-9 text-sm flex-1 bg-zinc-700 border-zinc-600 text-zinc-100">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

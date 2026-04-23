@@ -101,7 +101,7 @@ function TreeNode({ node, depth, isLast, selectedNodeId, onSelectNode, onToggleF
           }}
           style={{ paddingLeft: depth > 0 ? 12 : 4 }}
           className={`w-full h-8 rounded-md text-left text-sm flex items-center gap-1.5 transition-colors pr-2 ${
-            isSelected ? 'text-primary' : 'text-zinc-300 hover:bg-white/10 hover:text-zinc-100'
+            isSelected ? 'text-zinc-100' : 'text-zinc-400 hover:bg-white/10 hover:text-zinc-200'
           }`}
           title={node.name}
         >

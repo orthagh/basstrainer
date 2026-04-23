@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useLayoutEffect, useRef } from 'react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { PitchResult } from '../audio/pitchDetector';
 
 export interface TunerProps {
@@ -88,11 +89,18 @@ const TUNINGS: Record<string, Tuning> = {
   },
 };
 
-const TUNING_GROUPS = [
-  { label: 'BASS',   keys: ['bass_standard4', 'bass_dropD', 'bass_standard5'] },
-  { label: 'GUITAR', keys: ['guitar_standard', 'guitar_dropD', 'guitar_halfStepDown'] },
-  { label: 'OTHER',  keys: ['chromatic'] },
-] as const;
+const SEGMENTS: { label: string; key: keyof typeof TUNINGS }[] = [
+  { label: '4-STRING',  key: 'bass_standard4' },
+  { label: '5-STRING',  key: 'bass_standard5' },
+  { label: 'DROP D',    key: 'bass_dropD' },
+  { label: 'CHROMATIC', key: 'chromatic' },
+];
+
+const OVERFLOW_KEYS: (keyof typeof TUNINGS)[] = [
+  'guitar_standard',
+  'guitar_dropD',
+  'guitar_halfStepDown',
+];
 
 function getCents(freq: number, targetFreq: number): number {
   return 1200 * Math.log2(freq / targetFreq);
@@ -105,6 +113,18 @@ function getMidiFreq(midi: number): number {
 export default function Tuner({ currentPitch }: TunerProps) {
   const [tuningKey, setTuningKey] = useState<keyof typeof TUNINGS>('bass_standard4');
   const tuning = TUNINGS[tuningKey];
+
+  const segmentRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const overflowRef = useRef<HTMLButtonElement | null>(null);
+  const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const overflowActive = OVERFLOW_KEYS.includes(tuningKey as keyof typeof TUNINGS);
+    const el = overflowActive
+      ? overflowRef.current
+      : (segmentRefs.current[SEGMENTS.findIndex((s) => s.key === tuningKey)] ?? null);
+    if (el) setPill({ left: el.offsetLeft, width: el.offsetWidth });
+  }, [tuningKey]);
 
   const { targetName, cents } = useMemo(() => {
     if (!currentPitch || !currentPitch.frequency) {
@@ -153,40 +173,72 @@ export default function Tuner({ currentPitch }: TunerProps) {
 
   return (
     <div className="flex flex-col items-center gap-8">
-      {/* Tuning picker — grouped pill radio buttons */}
-      <div className="flex flex-wrap items-start justify-center gap-x-6 gap-y-4">
-        {TUNING_GROUPS.map((group, gi) => (
-          <div key={group.label} className="flex items-start gap-x-6">
-            <div className="flex flex-col items-center gap-2">
-              <span className="text-[10px] font-mono tracking-[0.18em] text-zinc-500 select-none">
-                {group.label}
-              </span>
-              <div className="flex gap-1">
-                {group.keys.map((key) => {
-                  const selected = tuningKey === key;
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setTuningKey(key)}
-                      className={[
-                        'px-3 py-1 rounded-full text-xs font-medium transition-colors border',
-                        selected
-                          ? 'bg-zinc-600 text-zinc-100 border-zinc-500'
-                          : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:border-zinc-700',
-                      ].join(' ')}
-                    >
-                      {TUNINGS[key].label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            {/* Vertical divider between groups */}
-            {gi < TUNING_GROUPS.length - 1 && (
-              <div className="mt-5 w-px h-6 bg-zinc-700 self-center" />
-            )}
-          </div>
-        ))}
+      {/* Tuning picker — segmented control */}
+      <div className="relative inline-flex gap-1 p-1 rounded-lg border border-zinc-800 bg-zinc-900">
+        {/* Sliding active indicator */}
+        {pill && (
+          <div
+            className="absolute top-1 bottom-1 rounded-md bg-zinc-800/70 border border-zinc-700 pointer-events-none"
+            style={{
+              left: pill.left,
+              width: pill.width,
+              transition: 'left 180ms cubic-bezier(0.4,0,0.2,1), width 180ms cubic-bezier(0.4,0,0.2,1)',
+            }}
+          />
+        )}
+
+        {SEGMENTS.map(({ label, key }, i) => {
+          const active = tuningKey === key;
+          return (
+            <button
+              key={key}
+              ref={(el) => { segmentRefs.current[i] = el; }}
+              onClick={() => setTuningKey(key)}
+              className={[
+                'relative px-3.5 py-2 rounded-md font-mono text-[11px] tracking-[0.12em] transition-colors',
+                active ? 'text-zinc-100' : 'text-zinc-500 hover:text-zinc-200',
+              ].join(' ')}
+            >
+              {label}
+            </button>
+          );
+        })}
+
+        {/* Overflow — guitar tunings */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              ref={overflowRef}
+              className={[
+                'relative px-3.5 py-2 rounded-md font-mono text-[11px] tracking-[0.12em] transition-colors',
+                OVERFLOW_KEYS.includes(tuningKey as keyof typeof TUNINGS)
+                  ? 'text-zinc-100'
+                  : 'text-zinc-500 hover:text-zinc-200',
+              ].join(' ')}
+            >
+              •••
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-44 p-1 bg-zinc-900 border-zinc-800" align="center" sideOffset={8}>
+            {OVERFLOW_KEYS.map((key) => {
+              const active = tuningKey === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setTuningKey(key)}
+                  className={[
+                    'w-full px-3 py-2 rounded-md text-left font-mono text-[11px] tracking-[0.12em] transition-colors',
+                    active
+                      ? 'bg-zinc-800/70 text-zinc-100'
+                      : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800',
+                  ].join(' ')}
+                >
+                  {TUNINGS[key].label}
+                </button>
+              );
+            })}
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Main display */}
@@ -307,10 +359,6 @@ export default function Tuner({ currentPitch }: TunerProps) {
             />
           </div>
 
-          {/* Cents readout */}
-          <div className="mt-2 text-center text-xs font-mono text-zinc-500">
-            {hasSignal ? `${cents >= 0 ? '+' : ''}${Math.round(cents)}¢` : '0¢'}
-          </div>
         </div>
       </div>
     </div>

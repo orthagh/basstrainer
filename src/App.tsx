@@ -145,7 +145,7 @@ function App() {
     <TooltipProvider>
       <div ref={mainCallbackRef} className="h-screen bg-background flex flex-col overflow-hidden">
         {/* Header with Navigation */}
-        <header className={`bg-zinc-700 py-4 px-6 flex items-center justify-between relative z-10 ${currentView !== 'tuner' ? 'border-b border-border' : ''}`}>
+        <header className={`bg-[#1c1c1f] border-b border-zinc-800 py-4 px-6 flex items-center justify-between relative z-10`}>
           <div className="flex items-center gap-3 flex-1">
             <div className="bg-primary text-primary-foreground p-2 rounded-lg">
               <FolderTree size={24} />
@@ -258,7 +258,7 @@ function App() {
         </header>
 
         {/* Main Content Layout */}
-        <div className="flex-1 flex min-h-0 relative z-10">
+        <div className="flex-1 flex min-h-0 relative z-10 bg-zinc-900">
           {/* Directory View */}
           {currentView === 'directory' && (
             <>
@@ -269,7 +269,7 @@ function App() {
                     onClick={() => setSidebarOpen(false)}
                     aria-hidden="true"
                   />
-                  <aside className="w-full sm:w-72 shrink-0 bg-zinc-700 border-r border-border flex flex-col overflow-hidden absolute inset-0 z-40 sm:relative sm:inset-auto shadow-2xl sm:shadow-none animate-in slide-in-from-left duration-200">
+                  <aside className="w-full sm:w-72 shrink-0 bg-zinc-900 border-r border-zinc-800 flex flex-col overflow-hidden absolute inset-0 z-40 sm:relative sm:inset-auto shadow-2xl sm:shadow-none animate-in slide-in-from-left duration-200">
                     <div className="flex items-center justify-between px-3 pt-3 pb-2 shrink-0 border-b border-white/10 sm:border-none">
                       <h3 className="font-semibold text-zinc-200 text-sm">Directory</h3>
                       <div className="flex items-center gap-1">
@@ -335,14 +335,14 @@ function App() {
               ) : (
                 <button
                   onClick={() => setSidebarOpen(true)}
-                  className="shrink-0 self-start m-2 p-2 bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors rounded-lg"
+                  className="shrink-0 self-start m-2 p-2 bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700 transition-colors rounded-lg"
                   title="Show directory"
                 >
                   <PanelLeftOpen size={20} />
                 </button>
               )}
 
-              <section className="flex-1 flex flex-col bg-card min-h-0 min-w-0">
+              <section className="dark flex-1 flex flex-col bg-zinc-900 min-h-0 min-w-0">
                 {directoryExercise ? (
                   <AlphaTabView
                     ref={alphaTabRef}

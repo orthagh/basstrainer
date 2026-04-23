@@ -64,11 +64,6 @@ export default function TunerPage({ isListening: globalListening, currentPitch: 
         {/* Microphone action — only when not yet listening */}
         {!isListening && (
           <div className="flex flex-col items-center gap-3 mt-8">
-            {audioError && (
-              <div className="p-3 rounded-lg bg-red-900/20 border border-red-800/40 text-red-400 text-sm text-center w-full max-w-md">
-                {audioError}
-              </div>
-            )}
             <button
               onClick={audioStart}
               disabled={autoStartAttempted && !isListening && !audioError}

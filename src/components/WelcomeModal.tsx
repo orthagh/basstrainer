@@ -12,50 +12,69 @@ export default function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="bg-card w-full max-w-lg rounded-xl shadow-2xl border border-border overflow-hidden animate-in zoom-in-95 duration-200">
         <div className="p-6 sm:p-8">
-          <div className="flex justify-center mb-6">
-            <div className="bg-primary text-primary-foreground p-4 rounded-full shadow-lg">
-              <Music size={40} />
+
+          {/* Header */}
+          <div className="mb-8">
+            <div className="inline-flex items-center gap-2 mb-4 px-3 py-1 rounded-full border border-border bg-muted text-[10px] font-mono tracking-[0.2em] text-muted-foreground">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary/70" />
+              WELCOME
             </div>
+
+            <h2 className="text-4xl font-medium tracking-tight leading-[1.1] text-foreground mb-4">
+              Time to <span className="italic font-normal text-primary">groove</span>.
+            </h2>
+
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              A personal practice tool for bass — browse your Guitar Pro files, play along with tablature, and use the built-in tuner and metronome.
+            </p>
           </div>
 
-          <h2 className="text-2xl font-bold text-center text-foreground mb-3">
-            Bass Groove Trainer
-          </h2>
-          <p className="text-center text-muted-foreground mb-8 text-sm">
-            A personal practice tool for bass — browse your Guitar Pro files, play along with tablature, and use the built-in tuner and metronome.
-          </p>
-
+          {/* Feature list */}
           <div className="space-y-4 mb-8">
             <div className="flex gap-4 items-start">
-              <div className="bg-muted p-2 rounded-lg text-foreground shrink-0"><FolderOpen size={20} /></div>
+              <div className="bg-muted p-2 rounded-lg text-foreground shrink-0">
+                <FolderOpen size={18} />
+              </div>
               <div>
                 <h3 className="font-semibold text-foreground text-sm">Your GP files</h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Drop Guitar Pro files into <code className="text-xs bg-muted px-1 rounded">repository-exercises/</code> and they appear in the directory browser, loaded directly — no conversion step.</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Drop Guitar Pro files into{' '}
+                  <code className="px-1.5 py-0.5 rounded bg-muted border border-border font-mono text-xs text-foreground">repository-exercises/</code>
+                  {' '}and they appear in the directory browser automatically.
+                </p>
               </div>
             </div>
 
             <div className="flex gap-4 items-start">
-              <div className="bg-muted p-2 rounded-lg text-foreground shrink-0"><Play size={20} /></div>
+              <div className="bg-muted p-2 rounded-lg text-foreground shrink-0">
+                <Play size={18} />
+              </div>
               <div>
                 <h3 className="font-semibold text-foreground text-sm">Playback controls</h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Loop any section, adjust tempo, metronome with count-in and accent, and toggle between standard notation and tab.</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Loop any section, adjust tempo, metronome with count-in and accent, toggle notation and tab.
+                </p>
               </div>
             </div>
 
             <div className="flex gap-4 items-start">
-              <div className="bg-muted p-2 rounded-lg text-foreground shrink-0"><Music size={20} /></div>
+              <div className="bg-muted p-2 rounded-lg text-foreground shrink-0">
+                <Music size={18} />
+              </div>
               <div>
-                <h3 className="font-semibold text-foreground text-sm">Tuner & metronome</h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Chromatic tuner with visual needle, and a standalone metronome with configurable subdivisions and click sounds.</p>
+                <h3 className="font-semibold text-foreground text-sm">Tuner &amp; metronome</h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  Chromatic tuner with visual needle and glow feedback, standalone metronome with configurable subdivisions.
+                </p>
               </div>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="w-full py-3 bg-primary text-primary-foreground font-semibold rounded-lg hover:bg-primary/90 transition-colors shadow-sm"
+            className="w-full py-3 bg-primary text-primary-foreground font-semibold rounded-lg hover:bg-primary/90 transition-colors"
           >
-            Let's Groove
+            Let&apos;s get started
           </button>
         </div>
       </div>
