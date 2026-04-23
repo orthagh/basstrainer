@@ -91,14 +91,12 @@ const MetronomePage = forwardRef<MetronomeHandle>((_props, ref) => {
         >
           {/* Tempo row */}
           <div className="flex items-center justify-center pb-4">
-            <div key={tapWave} className="tap-glow rounded-lg">
-              <BpmDisplay
-                value={m.tempo}
-                onChange={m.setTempo}
-                min={20}
-                max={300}
-              />
-            </div>
+            <BpmDisplay
+              value={m.tempo}
+              onChange={m.setTempo}
+              min={20}
+              max={300}
+            />
           </div>
           <RhythmPicker
             beatsPerBar={m.beatsPerBar}
@@ -122,7 +120,7 @@ const MetronomePage = forwardRef<MetronomeHandle>((_props, ref) => {
               className="p-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors select-none"
               aria-label="Tap tempo"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg key={tapWave} xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="tap-glow">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
                 <path d="M8 13v-8.5a1.5 1.5 0 0 1 3 0v7.5" />
                 <path d="M11 11.5v-2a1.5 1.5 0 0 1 3 0v2.5" />
