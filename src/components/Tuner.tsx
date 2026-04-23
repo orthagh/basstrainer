@@ -182,7 +182,7 @@ export default function Tuner({ currentPitch }: TunerProps) {
               const minH = 28;
               const h = maxH - (distance / center) * (maxH - minH);
 
-              let barStyle = '';
+              let barStyle: string;
               let style: React.CSSProperties = { height: `${h}px` };
 
               if (currentPitch?.frequency) {

@@ -22,10 +22,8 @@ export default function TunerPage({ isListening: globalListening, currentPitch: 
   useEffect(() => {
     if (!hasAutoStartedRef.current && audioStart && !globalListening) {
       hasAutoStartedRef.current = true;
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setAutoStartAttempted(true);
-      audioStart().catch(() => {
-        // Silently catch errors — we'll show the button instead
+      audioStart().finally(() => {
+        setAutoStartAttempted(true);
       });
     }
   }, [audioStart, globalListening]);
