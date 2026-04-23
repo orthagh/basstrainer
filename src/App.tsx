@@ -145,7 +145,7 @@ function App() {
     <TooltipProvider>
       <div ref={mainCallbackRef} className="h-screen bg-background flex flex-col overflow-hidden">
         {/* Header with Navigation */}
-        <header className="bg-zinc-700 border-b border-border py-4 px-6 flex items-center justify-between relative z-10">
+        <header className={`bg-zinc-700 py-4 px-6 flex items-center justify-between relative z-10 ${currentView !== 'tuner' ? 'border-b border-border' : ''}`}>
           <div className="flex items-center gap-3 flex-1">
             <div className="bg-primary text-primary-foreground p-2 rounded-lg">
               <FolderTree size={24} />
@@ -353,22 +353,48 @@ function App() {
                     onMetronomeConfigChange={setMetronomeConfig}
                   />
                 ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground animate-in fade-in zoom-in-95 duration-300">
-                    <div className="bg-muted p-6 rounded-full mb-6">
-                      <FolderTree size={48} className="text-primary/50" />
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-300 relative overflow-hidden">
+                    {/* Ghost bass-clef watermark, bottom-right corner */}
+                    <svg viewBox="0 0 200 280" className="absolute -right-8 -bottom-10 w-80 h-[28rem] text-primary/[0.04] pointer-events-none" fill="currentColor">
+                      <path d="M110 20 C 60 30, 50 90, 85 120 C 130 150, 140 220, 90 250 M128 70 a 8 8 0 1 0 0.1 0 M128 110 a 8 8 0 1 0 0.1 0"
+                            stroke="currentColor" strokeWidth="16" fill="none" strokeLinecap="round" />
+                    </svg>
+
+                    <div className="relative max-w-xl">
+                      <div className="inline-flex items-center gap-2 mb-5 px-3 py-1 rounded-full border border-border bg-muted text-[10px] font-mono tracking-[0.2em] text-muted-foreground">
+                        <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60" />
+                        READY WHEN YOU ARE
+                      </div>
+
+                      <h2 className="text-5xl md:text-6xl font-medium text-foreground tracking-tight leading-[1] mb-5">
+                        Pick an <span className="italic font-normal text-primary">exercise</span>
+                        <span className="text-primary">.</span>
+                      </h2>
+
+                      <p className="text-sm leading-relaxed text-muted-foreground max-w-md mx-auto mb-7">
+                        Open something from the directory on the left — or drop a Guitar Pro file into{' '}
+                        <code className="px-1.5 py-0.5 rounded bg-muted border border-border font-mono text-xs text-foreground">repository-exercises/</code>
+                        , run <code className="px-1.5 py-0.5 rounded bg-muted border border-border font-mono text-xs text-foreground">npm run exercises:convert</code>, and reload.
+                      </p>
+
+                      <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-mono tracking-[0.15em] text-muted-foreground mr-2">SUPPORTED</span>
+                        {['.gp', '.gpx', '.gp3', '.gp4', '.gp5'].map((ext) => (
+                          <span key={ext} className="font-mono text-[11px] px-2 py-0.5 rounded bg-muted border border-border text-muted-foreground">
+                            {ext}
+                          </span>
+                        ))}
+                      </div>
+
+                      {!sidebarOpen && (
+                        <button
+                          onClick={() => setSidebarOpen(true)}
+                          className="mt-8 px-6 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors font-medium"
+                        >
+                          Open Directory
+                        </button>
+                      )}
                     </div>
-                    <h2 className="text-2xl font-semibold text-foreground mb-3">Exercise Directory</h2>
-                    <p className="max-w-md text-sm leading-relaxed">
-                      Put your files in repository-exercises/, run npm run exercises:convert, then reload this page.
-                    </p>
-                    {!sidebarOpen && (
-                      <button
-                        onClick={() => setSidebarOpen(true)}
-                        className="mt-8 px-6 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors font-medium"
-                      >
-                        Open Directory
-                      </button>
-                    )}
                   </div>
                 )}
               </section>

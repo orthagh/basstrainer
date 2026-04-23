@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
 import type { PitchResult } from '../audio/pitchDetector';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 
 export interface TunerProps {
   currentPitch?: PitchResult | null;
@@ -8,6 +7,7 @@ export interface TunerProps {
 
 type Tuning = {
   name: string;
+  label: string;
   notes: { name: string; freq: number }[];
 };
 
@@ -15,6 +15,7 @@ const TUNINGS: Record<string, Tuning> = {
   // ── Bass Tunings ──
   bass_standard4: {
     name: 'Bass - Standard (EADG)',
+    label: 'Standard',
     notes: [
       { name: 'E1', freq: 41.20 },
       { name: 'A1', freq: 55.00 },
@@ -24,6 +25,7 @@ const TUNINGS: Record<string, Tuning> = {
   },
   bass_dropD: {
     name: 'Bass - Drop D (DADG)',
+    label: 'Drop D',
     notes: [
       { name: 'D1', freq: 36.71 },
       { name: 'A1', freq: 55.00 },
@@ -33,6 +35,7 @@ const TUNINGS: Record<string, Tuning> = {
   },
   bass_standard5: {
     name: 'Bass - 5-String (BEADG)',
+    label: '5-String',
     notes: [
       { name: 'B0', freq: 30.87 },
       { name: 'E1', freq: 41.20 },
@@ -44,6 +47,7 @@ const TUNINGS: Record<string, Tuning> = {
   // ── Guitar Tunings ──
   guitar_standard: {
     name: 'Guitar - Standard (EADGBE)',
+    label: 'Standard',
     notes: [
       { name: 'E2', freq: 82.41 },
       { name: 'A2', freq: 110.00 },
@@ -55,6 +59,7 @@ const TUNINGS: Record<string, Tuning> = {
   },
   guitar_dropD: {
     name: 'Guitar - Drop D (DADGBE)',
+    label: 'Drop D',
     notes: [
       { name: 'D2', freq: 73.42 },
       { name: 'A2', freq: 110.00 },
@@ -66,6 +71,7 @@ const TUNINGS: Record<string, Tuning> = {
   },
   guitar_halfStepDown: {
     name: 'Guitar - Half Step Down (D#G#C#F#A#D#)',
+    label: '½ Step Down',
     notes: [
       { name: 'D#2', freq: 77.78 },
       { name: 'G#2', freq: 103.83 },
@@ -77,9 +83,16 @@ const TUNINGS: Record<string, Tuning> = {
   },
   chromatic: {
     name: 'Chromatic',
+    label: 'Chromatic',
     notes: [],
   },
 };
+
+const TUNING_GROUPS = [
+  { label: 'BASS',   keys: ['bass_standard4', 'bass_dropD', 'bass_standard5'] },
+  { label: 'GUITAR', keys: ['guitar_standard', 'guitar_dropD', 'guitar_halfStepDown'] },
+  { label: 'OTHER',  keys: ['chromatic'] },
+] as const;
 
 function getCents(freq: number, targetFreq: number): number {
   return 1200 * Math.log2(freq / targetFreq);
@@ -128,120 +141,178 @@ export default function Tuner({ currentPitch }: TunerProps) {
     };
   }, [currentPitch, tuning, tuningKey]);
 
-  const isTuned = Math.abs(cents) < 5;
+  const hasSignal = !!currentPitch?.frequency;
+  const glow = hasSignal ? Math.max(0, 1 - Math.min(Math.abs(cents), 20) / 20) : 0;
+  const inTune = hasSignal && Math.abs(cents) < 3;
+  const accentColor = inTune ? 'rgb(52 211 153)' : 'rgb(251 191 36)';
+
+  const noteLetter = hasSignal ? targetName.replace(/\d+$/, '') : '—';
+  const noteOctave = hasSignal ? (targetName.match(/\d+$/) ?? [''])[0] : '';
+
+  const clampedCents = Math.max(-50, Math.min(50, cents));
 
   return (
-    <div className="bg-card p-3 rounded-lg border border-border space-y-4">
-      <div className="flex items-center justify-center">
-        <Select value={tuningKey} onValueChange={setTuningKey}>
-          <SelectTrigger className="h-8 w-56 text-sm border-border bg-card">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectLabel className="text-xs font-semibold">Bass</SelectLabel>
-              {Object.entries(TUNINGS)
-                .filter(([key]) => key.startsWith('bass_'))
-                .map(([key, t]) => (
-                  <SelectItem key={key} value={key} className="text-sm">
-                    {t.name.replace('Bass - ', '')}
-                  </SelectItem>
-                ))}
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel className="text-xs font-semibold">Guitar</SelectLabel>
-              {Object.entries(TUNINGS)
-                .filter(([key]) => key.startsWith('guitar_'))
-                .map(([key, t]) => (
-                  <SelectItem key={key} value={key} className="text-sm">
-                    {t.name.replace('Guitar - ', '')}
-                  </SelectItem>
-                ))}
-            </SelectGroup>
-            <SelectGroup>
-              <SelectLabel className="text-xs font-semibold">Other</SelectLabel>
-              {Object.entries(TUNINGS)
-                .filter(([key]) => !key.startsWith('bass_') && !key.startsWith('guitar_'))
-                .map(([key, t]) => (
-                  <SelectItem key={key} value={key} className="text-sm">
-                    {t.name}
-                  </SelectItem>
-                ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+    <div className="flex flex-col items-center gap-8">
+      {/* Tuning picker — grouped pill radio buttons */}
+      <div className="flex flex-wrap items-start justify-center gap-x-6 gap-y-4">
+        {TUNING_GROUPS.map((group, gi) => (
+          <div key={group.label} className="flex items-start gap-x-6">
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-[10px] font-mono tracking-[0.18em] text-zinc-500 select-none">
+                {group.label}
+              </span>
+              <div className="flex gap-1">
+                {group.keys.map((key) => {
+                  const selected = tuningKey === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setTuningKey(key)}
+                      className={[
+                        'px-3 py-1 rounded-full text-xs font-medium transition-colors border',
+                        selected
+                          ? 'bg-zinc-600 text-zinc-100 border-zinc-500'
+                          : 'text-zinc-500 border-transparent hover:text-zinc-300 hover:border-zinc-700',
+                      ].join(' ')}
+                    >
+                      {TUNINGS[key].label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Vertical divider between groups */}
+            {gi < TUNING_GROUPS.length - 1 && (
+              <div className="mt-5 w-px h-6 bg-zinc-700 self-center" />
+            )}
+          </div>
+        ))}
       </div>
 
-      <div className="relative w-full flex flex-col items-center justify-center gap-2 pt-2 pb-1">
-        {/* PolyTune-style LED Bars — hang from top, V-shape pointing down */}
-        <div className="flex items-start justify-center gap-[5px] h-50 w-full">
-           {Array.from({ length: 11 }).map((_, i) => {
-              const center = 5;
-              const distance = Math.abs(i - center);
-              const maxH = 160;
-              const minH = 28;
-              const h = maxH - (distance / center) * (maxH - minH);
+      {/* Main display */}
+      <div className="relative flex flex-col items-center gap-8 w-full overflow-hidden py-4">
+        {/* Ambient background glow */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `radial-gradient(ellipse 60% 50% at center, ${accentColor} 0%, transparent 55%)`,
+            opacity: glow * 0.15,
+            transition: 'opacity 120ms ease-out',
+          }}
+        />
 
-              let barStyle: string;
-              let style: React.CSSProperties = { height: `${h}px` };
+        {/* Large note display */}
+        <div className="relative flex items-end justify-center gap-1 leading-none select-none">
+          <span
+            className="font-mono text-zinc-100"
+            style={{
+              fontSize: 'clamp(120px, 16vw, 240px)',
+              lineHeight: 1,
+              opacity: hasSignal ? 1 : 0.35,
+              textShadow: hasSignal ? `0 0 ${20 + glow * 80}px ${accentColor}` : 'none',
+              transition: 'text-shadow 120ms ease-out, opacity 200ms ease-out',
+            }}
+          >
+            {noteLetter}
+          </span>
+          {noteOctave && (
+            <span
+              className="font-mono text-zinc-100"
+              style={{
+                fontSize: 'clamp(40px, 5vw, 72px)',
+                lineHeight: 1,
+                marginBottom: 'clamp(12px, 1.5vw, 24px)',
+                opacity: 0.7,
+                textShadow: `0 0 ${20 + glow * 80}px ${accentColor}`,
+                transition: 'text-shadow 120ms ease-out',
+              }}
+            >
+              {noteOctave}
+            </span>
+          )}
+        </div>
 
-              if (currentPitch?.frequency) {
-                // Map cents to bar index: -50→0, 0→5, +50→10
-                const clampedCents = Math.max(-50, Math.min(50, cents));
-                const activeIndex = Math.round((clampedCents / 50) * center) + center;
-                const dist = Math.abs(i - activeIndex);
-
-                if (dist === 0) {
-                  if (isTuned) {
-                    barStyle = 'bg-emerald-400';
-                    style = {
-                      ...style,
-                      boxShadow: '0 0 8px 4px rgba(52,211,153,0.9), 0 0 22px 8px rgba(52,211,153,0.55), 0 0 40px 12px rgba(52,211,153,0.25)',
-                    };
-                  } else {
-                    barStyle = 'bg-amber-400';
-                    style = {
-                      ...style,
-                      boxShadow: '0 0 8px 4px rgba(251,191,36,0.9), 0 0 22px 8px rgba(251,191,36,0.55), 0 0 40px 12px rgba(251,191,36,0.25)',
-                    };
-                  }
-                } else if (dist === 1) {
-                  barStyle = isTuned ? 'bg-emerald-500/60' : 'bg-amber-500/60';
-                  style = {
-                    ...style,
-                    boxShadow: isTuned
-                      ? '0 0 5px 3px rgba(52,211,153,0.35), 0 0 12px 5px rgba(52,211,153,0.15)'
-                      : '0 0 5px 3px rgba(251,191,36,0.35), 0 0 12px 5px rgba(251,191,36,0.15)',
-                  };
-                } else {
-                  barStyle = 'bg-muted-foreground/10';
-                }
-              } else {
-                barStyle = i === center ? 'bg-muted-foreground/25' : 'bg-muted-foreground/10';
-              }
-
+        {/* Horizontal pitch strip */}
+        <div className="relative w-full max-w-[800px] px-2">
+          <div className="relative w-full" style={{ height: '64px' }}>
+            {/* 41 graduation ticks */}
+            {Array.from({ length: 41 }).map((_, i) => {
+              const isCenter = i === 20;
+              const isMajor = i % 5 === 0;
+              const tickH = isMajor ? 32 : 16;
+              const tickW = isCenter ? 3 : isMajor ? 2 : 1;
               return (
                 <div
                   key={i}
-                  className={`w-6 rounded-sm transition-all duration-75 ${barStyle}`}
-                  style={style}
+                  style={{
+                    position: 'absolute',
+                    left: `${(i / 40) * 100}%`,
+                    bottom: 0,
+                    transform: 'translateX(-50%)',
+                    width: `${tickW}px`,
+                    height: `${tickH}px`,
+                    backgroundColor: isCenter
+                      ? accentColor
+                      : isMajor
+                        ? 'rgba(161,161,170,0.35)'
+                        : 'rgba(161,161,170,0.12)',
+                    borderRadius: '1px',
+                  }}
                 />
               );
-           })}
+            })}
+
+            {/* ±3¢ in-tune zone lines */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                left: `calc(50% + ${3 * 6}px)`,
+                transform: 'translateX(-50%)',
+                width: '1px',
+                height: '40px',
+                backgroundColor: accentColor,
+                opacity: 0.25,
+                transition: 'background-color 120ms ease-out',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                left: `calc(50% - ${3 * 6}px)`,
+                transform: 'translateX(-50%)',
+                width: '1px',
+                height: '40px',
+                backgroundColor: accentColor,
+                opacity: 0.25,
+                transition: 'background-color 120ms ease-out',
+              }}
+            />
+
+            {/* Needle */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                left: `calc(50% + ${clampedCents * 6}px)`,
+                transform: 'translateX(-50%)',
+                width: inTune ? '6px' : '4px',
+                height: '56px',
+                backgroundColor: accentColor,
+                borderRadius: '2px',
+                boxShadow: hasSignal ? `0 0 ${12 + glow * 40}px ${accentColor}` : 'none',
+                transition: 'left 80ms ease-out, box-shadow 120ms ease-out, width 120ms ease-out, background-color 120ms ease-out',
+              }}
+            />
+          </div>
+
+          {/* Cents readout */}
+          <div className="mt-2 text-center text-xs font-mono text-zinc-500">
+            {hasSignal ? `${cents >= 0 ? '+' : ''}${Math.round(cents)}¢` : '0¢'}
+          </div>
         </div>
-        {/* Note label — below bars */}
-        <div className="flex flex-col items-center justify-center h-24 mb-4">
-           <div 
-             className="text-[100px] text-[#6b6354]"
-             style={{ 
-               fontFamily: "'DSEG14-Classic', monospace",
-               fontStyle: "italic",
-               textShadow: "0 0 12px rgba(107, 99, 84, 0.8), 0 0 24px rgba(107, 99, 84, 0.4)"
-             }}
-           >
-             {currentPitch?.frequency ? targetName.replace(/\d+$/, '') : '-'}
-           </div>
-        </div>      </div>
+      </div>
     </div>
   );
 }
