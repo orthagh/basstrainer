@@ -47,7 +47,7 @@ jobs:
       - name: Upload Build Artifacts
         # Only upload artifacts if we are on the main branch (so we can deploy)
         if: github.event_name == 'push'
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: './dist'
 
