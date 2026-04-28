@@ -8,7 +8,6 @@ import {
   model,
 } from '@coderline/alphatab';
 import type { Exercise } from '../types';
-import { buildTempoMap, tickToMs } from '../audio/noteExtractor';
 import MetronomeSettings, { type MetronomeConfig } from './MetronomeSettings';
 import DisplaySettings from './DisplaySettings';
 import { loadStaveProfile, type StaveProfile } from '@/lib/displaySettings';
@@ -22,7 +21,6 @@ import InstrumentIcon from './InstrumentIcon';
 
 interface SectionMarker {
   text: string;
-  startMs: number;
   startTick: number;
 }
 
@@ -129,13 +127,13 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
   const baseTempo = useRef(exercise.defaultTempo);
   const [currentTime, setCurrentTime] = useState(0);
   const [endTime, setEndTime] = useState(0);
-  const [scoreDurationMs, setScoreDurationMs] = useState(0);
   const [staveProfile, setStaveProfile] = useState<StaveProfile>(() => loadStaveProfile());
   const [scoreDark, setScoreDark] = useState<boolean>(() => {
     const stored = localStorage.getItem(SCORE_DARK_LS_KEY);
     return stored === null ? true : stored === 'true';
   });
   const [sections, setSections] = useState<SectionMarker[]>([]);
+  const [scoreDurationTicks, setScoreDurationTicks] = useState(0);
 
   const [isLooping, setIsLooping] = useState(false);
   const [availableTracks, setAvailableTracks] = useState<AlphaTabTrack[]>([]);
@@ -163,13 +161,14 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
     playerReadyRef.current = false;
     setCurrentTime(0);
     setEndTime(0);
-    setScoreDurationMs(0);
+    setScoreDurationTicks(0);
     setAvailableTracks([]);
     setSelectedTrackIndex(null);
     setMutedTrackIndexes([]);
     setSoloTrackIndexes([]);
     setTrackVolumes({});
     setSections([]);
+    setScoreDurationTicks(0);
 
     const api = new AlphaTabApi(containerRef.current, {
       core: {
@@ -274,23 +273,21 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
 
       // Extract section markers for the progress bar
       if (api.score && api.tickCache) {
-        const tempoMap = buildTempoMap(api);
         const mbs = api.tickCache.masterBars;
         if (mbs.length > 0) {
-          const lastMb = mbs[mbs.length - 1];
-          setScoreDurationMs(tickToMs(tempoMap, lastMb.end));
+          setScoreDurationTicks(mbs[mbs.length - 1].end);
         }
         const extracted: SectionMarker[] = [];
-        for (const mb of api.tickCache.masterBars) {
+        for (const mb of mbs) {
           const sec = mb.masterBar.section;
           if (sec) {
             const label = sec.text?.trim() || sec.marker?.trim() || '';
-            extracted.push({ text: label, startMs: tickToMs(tempoMap, mb.start), startTick: mb.start });
+            extracted.push({ text: label, startTick: mb.start });
           }
         }
         // If the score starts before the first section marker, prepend an unnamed section at tick 0
         if (extracted.length > 0 && extracted[0].startTick > 0) {
-          extracted.unshift({ text: '', startMs: 0, startTick: 0 });
+          extracted.unshift({ text: '', startTick: 0 });
         }
         setSections(extracted);
       }
@@ -917,10 +914,9 @@ const AlphaTabView = forwardRef<AlphaTabHandle, AlphaTabViewProps>(function Alph
           <div className="flex-1 relative overflow-hidden bg-zinc-900">
             {/* Section bands */}
             {sections.length > 0 && sections.map((section, i) => {
-              const duration = Math.max(endTime, scoreDurationMs);
-              const startPct = duration > 0 ? (section.startMs / duration) * 100 : 0;
-              const nextStartMs = sections[i + 1]?.startMs ?? duration;
-              const widthPct = duration > 0 ? ((nextStartMs - section.startMs) / duration) * 100 : 0;
+              const nextStartTick = sections[i + 1]?.startTick ?? scoreDurationTicks;
+              const startPct = scoreDurationTicks > 0 ? (section.startTick / scoreDurationTicks) * 100 : 0;
+              const widthPct = scoreDurationTicks > 0 ? ((nextStartTick - section.startTick) / scoreDurationTicks) * 100 : 0;
               return (
                 <button
                   key={i}
