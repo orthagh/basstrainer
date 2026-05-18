@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Keyboard, Info, AudioLines, FolderTree, Search, X } from 'lucide-react';
+import { Maximize, Minimize, PanelLeftClose, PanelLeftOpen, Keyboard, Info, AudioLines, FolderTree, Search, X, Dumbbell } from 'lucide-react';
+import PracticeHub from './features/practice/PracticeHub';
 import MetronomeIcon from './components/MetronomeIcon';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { PortalContainerContext } from '@/components/ui/portal-container';
@@ -21,9 +22,9 @@ import type { MetronomeConfig } from './components/MetronomeSettings';
 import { useExerciseDirectory } from './features/exerciseDirectory/useExerciseDirectory.ts';
 import './components/alphatab.css';
 
-type AppView = 'directory' | 'tuner' | 'metronome';
+type AppView = 'directory' | 'tuner' | 'metronome' | 'practice';
 
-const VIEWS: AppView[] = ['directory', 'tuner', 'metronome'];
+const VIEWS: AppView[] = ['directory', 'tuner', 'metronome', 'practice'];
 const METRONOME_CONFIG_LS_KEY = 'groovetrainer:metronomeConfig';
 
 function viewFromHash(): AppView {
@@ -192,6 +193,18 @@ function App() {
             >
               <MetronomeIcon size={24} />
               <span className="text-xs font-medium">Metronome</span>
+            </button>
+            <button
+              onClick={() => navigateTo('practice')}
+              className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors ${
+                currentView === 'practice'
+                  ? 'bg-white/15 text-zinc-100'
+                  : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/10'
+              }`}
+              title="Practice"
+            >
+              <Dumbbell size={24} />
+              <span className="text-xs font-medium">Practice</span>
             </button>
           </div>
 
@@ -415,6 +428,13 @@ function App() {
           {currentView === 'metronome' && (
             <MetronomePage ref={metronomeRef} />
           )}
+
+          {/* Practice View */}
+          {currentView === 'practice' && (
+            <PracticeHub />
+          )}
+
+
         </div>
 
         {/* Welcome Modal Splash Screen */}
