@@ -22,9 +22,9 @@ import type { MetronomeConfig } from './components/MetronomeSettings';
 import { useExerciseDirectory } from './features/exerciseDirectory/useExerciseDirectory.ts';
 import './components/alphatab.css';
 
-type AppView = 'directory' | 'tuner' | 'metronome' | 'practice';
+type AppView = 'directory' | 'metronome' | 'practice';
 
-const VIEWS: AppView[] = ['directory', 'tuner', 'metronome', 'practice'];
+const VIEWS: AppView[] = ['directory', 'metronome', 'practice'];
 const METRONOME_CONFIG_LS_KEY = 'groovetrainer:metronomeConfig';
 
 function viewFromHash(): AppView {
@@ -34,6 +34,13 @@ function viewFromHash(): AppView {
 
 function App() {
   const [currentView, setCurrentView] = useState<AppView>(viewFromHash);
+  const [tunerOpen, setTunerOpen] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setTunerOpen(false); };
+    if (tunerOpen) document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [tunerOpen]);
 
   const navigateTo = useCallback((view: AppView) => {
     window.location.hash = view;
@@ -171,18 +178,6 @@ function App() {
               <span className="text-xs font-medium">Directory</span>
             </button>
             <button
-              onClick={() => navigateTo('tuner')}
-              className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors ${
-                currentView === 'tuner'
-                  ? 'bg-white/15 text-zinc-100'
-                  : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/10'
-              }`}
-              title="Bass Tuner"
-            >
-              <AudioLines size={24} />
-              <span className="text-xs font-medium">Tuner</span>
-            </button>
-            <button
               onClick={() => navigateTo('metronome')}
               className={`flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-colors ${
                 currentView === 'metronome'
@@ -209,6 +204,17 @@ function App() {
           </div>
 
           <div className="flex items-center gap-1 flex-1 justify-end">
+            <button
+              onClick={() => setTunerOpen(true)}
+              className={`p-2 rounded-full transition-colors ${
+                tunerOpen
+                  ? 'text-amber-400 bg-white/10'
+                  : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/10'
+              }`}
+              title="Tuner"
+            >
+              <AudioLines size={20} />
+            </button>
             <a
               href="https://github.com/orthagh/basstrainer"
               target="_blank"
@@ -414,16 +420,6 @@ function App() {
             </>
           )}
 
-          {/* Tuner View */}
-          {currentView === 'tuner' && (
-            <TunerPage
-              isListening={audio.isListening}
-              currentPitch={audio.currentPitch}
-              audioStart={audio.start}
-              audioError={audio.error}
-            />
-          )}
-
           {/* Metronome View */}
           {currentView === 'metronome' && (
             <MetronomePage ref={metronomeRef} />
@@ -436,6 +432,36 @@ function App() {
 
 
         </div>
+
+        {/* Tuner Modal */}
+        {tunerOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={(e) => { if (e.target === e.currentTarget) setTunerOpen(false); }}
+          >
+            <div className="relative w-full max-w-2xl mx-4 bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-6 pt-5 pb-0">
+                <div className="flex items-center gap-2 text-zinc-100">
+                  <AudioLines size={18} className="text-amber-400" />
+                  <span className="font-semibold text-sm">Tuner</span>
+                </div>
+                <button
+                  onClick={() => setTunerOpen(false)}
+                  className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-white/10 rounded-full transition-colors"
+                  title="Close tuner"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <TunerPage
+                isListening={audio.isListening}
+                currentPitch={audio.currentPitch}
+                audioStart={audio.start}
+                audioError={audio.error}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Welcome Modal Splash Screen */}
         <WelcomeModal isOpen={showWelcome} onClose={handleCloseWelcome} />
