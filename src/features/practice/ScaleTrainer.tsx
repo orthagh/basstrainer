@@ -286,6 +286,7 @@ export default function ScaleTrainer({ onBack }: Props) {
   // End session when all runs done
   useEffect(() => {
     if (screen === 'playing' && runIdx >= runs.length && runs.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setScreen('result');
     }
   }, [screen, runIdx, runs.length]);

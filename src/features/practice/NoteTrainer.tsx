@@ -185,6 +185,7 @@ export default function NoteTrainer({ onBack }: Props) {
   // End session when queue exhausted
   useEffect(() => {
     if (screen === 'playing' && currentIdx >= queue.length && queue.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setScreen('result');
     }
   }, [screen, currentIdx, queue.length]);

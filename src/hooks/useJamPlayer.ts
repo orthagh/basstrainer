@@ -222,6 +222,7 @@ export function useJamPlayer(
   // ── Initialize instruments once ───────────────────────────────────────────
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoaded(false);
 
     const kit = new DrumKit();
