@@ -34,6 +34,8 @@ export default function ChordChangesTrainer({ onBack }: Props) {
   const handleStyleChange = (s: Style) => {
     setStyle(s);
     setProgIndex(0);
+    const firstProg = PROGRESSIONS[s][0];
+    if (firstProg?.originalKey) setRootNote(firstProg.originalKey as RootNote);
   };
 
   const handleStart = () => {
@@ -82,7 +84,12 @@ export default function ChordChangesTrainer({ onBack }: Props) {
                 key={style}
                 items={PROGRESSIONS[style].map((prog, i) => ({ value: String(i), label: prog.name }))}
                 selected={String(progIndex)}
-                onSelect={v => setProgIndex(Number(v))}
+                onSelect={v => {
+                  const idx = Number(v);
+                  setProgIndex(idx);
+                  const prog = PROGRESSIONS[style][idx];
+                  if (prog?.originalKey) setRootNote(prog.originalKey as RootNote);
+                }}
               />
             </div>
 
