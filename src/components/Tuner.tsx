@@ -123,7 +123,6 @@ export default function Tuner({ currentPitch }: TunerProps) {
     const el = overflowActive
       ? overflowRef.current
       : (segmentRefs.current[SEGMENTS.findIndex((s) => s.key === tuningKey)] ?? null);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (el) setPill({ left: el.offsetLeft, width: el.offsetWidth });
   }, [tuningKey]);
 
