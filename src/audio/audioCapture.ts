@@ -18,6 +18,8 @@ export class AudioCapture {
   private source: MediaStreamAudioSourceNode | null = null;
   private analyser: AnalyserNode | null = null;
   private gain: GainNode | null = null;
+  private silentGain: GainNode | null = null;
+  private onVisibilityChange: (() => void) | null = null;
 
   private _isCapturing = false;
 
@@ -66,6 +68,26 @@ export class AudioCapture {
     this.gain.connect(this.analyser);
     // Don't connect to destination — no feedback loop!
 
+    // Browsers auto-suspend AudioContexts with no output path. Route through a
+    // zero-gain node to keep the context alive without producing any sound.
+    this.silentGain = this.ctx.createGain();
+    this.silentGain.gain.value = 0;
+    this.analyser.connect(this.silentGain);
+    this.silentGain.connect(this.ctx.destination);
+
+    // Resume immediately in case the context started in a suspended state.
+    if (this.ctx.state === 'suspended') {
+      await this.ctx.resume();
+    }
+
+    // Resume when the tab becomes visible again after being hidden.
+    this.onVisibilityChange = () => {
+      if (!document.hidden && this.ctx?.state === 'suspended') {
+        this.ctx.resume().catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
+
     this._isCapturing = true;
   }
 
@@ -101,6 +123,14 @@ export class AudioCapture {
    * Stop capture and release all resources.
    */
   stop(): void {
+    if (this.onVisibilityChange) {
+      document.removeEventListener('visibilitychange', this.onVisibilityChange);
+      this.onVisibilityChange = null;
+    }
+    if (this.silentGain) {
+      this.silentGain.disconnect();
+      this.silentGain = null;
+    }
     if (this.source) {
       this.source.disconnect();
       this.source = null;
