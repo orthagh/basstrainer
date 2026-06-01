@@ -13,7 +13,7 @@
     "exercises:convert": "node ./scripts/convert-repository-exercises.mjs"
   },
   "dependencies": {
-    "@coderline/alphatab": "^1.8.2",
+    "@coderline/alphatab": "^1.8.3",
     "@fontsource-variable/geist": "^5.2.9",
     "@iconify-json/qlementine-icons": "^1.2.15",
     "@iconify/react": "^6.0.2",
@@ -25,7 +25,7 @@
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-icons": "^5.6.0",
-    "shadcn": "^4.7.0",
+    "shadcn": "^4.9.0",
     "tailwind-merge": "^3.6.0",
     "tonal": "^6.4.3",
     "tone": "^15.1.22",
