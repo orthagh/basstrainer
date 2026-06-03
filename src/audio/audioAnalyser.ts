@@ -46,7 +46,10 @@ export class AudioAnalyser {
     // Use a larger FFT size (8192) to reliably capture low bass frequencies down to ~30Hz
     await this.capture.start({ fftSize: 8192 });
 
-    // Pass a lower silence threshold (0.003) so quieter sounds still get pitch tracked
+    // Silence gate. Kept at 0.003 deliberately: lowering it lets low-level
+    // hum/noise during silence clear the gate, where YIN locks onto a constant
+    // value and the smoothing freezes the needle mid-strip. Weak passive basses
+    // are better helped by a touch more amp gain than by opening this gate.
     this.pitchDetector = new PitchDetector(this.capture.sampleRate, 0.003);
     this._isRunning = true;
 

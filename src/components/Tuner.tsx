@@ -359,6 +359,10 @@ export default function Tuner({ currentPitch }: TunerProps) {
             />
           </div>
 
+          {/* Cents readout */}
+          <div className="mt-2 text-center text-xs font-mono text-zinc-500">
+            {hasSignal ? `${cents >= 0 ? '+' : ''}${Math.round(cents)}¢` : '0¢'}
+          </div>
         </div>
       </div>
     </div>
