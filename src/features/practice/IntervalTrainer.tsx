@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
-import { ArrowLeft, ChevronRight, Play, X } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Lightbulb, Play, Volume2, X } from 'lucide-react';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../../components/ui/select';
 import Fretboard from '../../components/Fretboard';
 import type { FretHighlight } from '../../components/Fretboard';
@@ -12,6 +12,7 @@ import {
 } from '../../lib/musicTheory';
 import { usePracticeProgress } from './usePracticeProgress';
 import { useAudioInput } from '../../hooks/useAudioInput';
+import { playMidiSequence, isNotePlaying, preloadBassSynth } from '../../audio/bassSynth';
 
 // Open string MIDI values for levels 1-3
 const OPEN_STRING_MIDIS = STANDARD_BASS_4; // [28, 33, 38, 43]
@@ -155,6 +156,7 @@ export default function IntervalTrainer({ onBack }: Props) {
   const [step, setStep] = useState<Step>('root');
   const [flash, setFlash] = useState<Flash>('none');
   const [advancing, setAdvancing] = useState(false);
+  const [revealed, setRevealed] = useState(false); // target shown (hint or after correct)
 
   const audio = useAudioInput();
   const prevMidiRef = useRef<number | null>(null);
@@ -175,6 +177,7 @@ export default function IntervalTrainer({ onBack }: Props) {
     setTimeout(() => {
       setFlash('none');
       setStep('root');
+      setRevealed(false);
       prevMidiRef.current = null;
       stableFramesRef.current = 0;
       setCurrentIdx(i => i + 1);
@@ -190,9 +193,30 @@ export default function IntervalTrainer({ onBack }: Props) {
     }
   }, [screen, currentIdx, challenges.length]);
 
+  // Play root → target as an ear cue; reusable for the replay button
+  const playCue = useCallback(() => {
+    if (!currentChallenge) return;
+    void playMidiSequence([currentChallenge.rootMidi, currentChallenge.targetMidi], {
+      noteMs: 600,
+      gapMs: 120,
+    });
+  }, [currentChallenge]);
+
+  // Auto-play the cue when a new challenge appears
+  useEffect(() => {
+    if (screen !== 'playing' || !currentChallenge) return;
+    playCue();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, currentIdx]);
+
   // Note onset detection
   useEffect(() => {
     if (screen !== 'playing' || advancing || !currentChallenge) return;
+    if (isNotePlaying()) {
+      prevMidiRef.current = null;
+      stableFramesRef.current = 0;
+      return;
+    }
     const { midi } = audio.currentPitch;
     if (midi === null) {
       prevMidiRef.current = null;
@@ -228,8 +252,10 @@ export default function IntervalTrainer({ onBack }: Props) {
     setCurrentIdx(0);
     setStep('root');
     setFlash('none');
+    setRevealed(false);
     setAdvancing(false);
     advancingRef.current = false;
+    preloadBassSynth();
     setScreen('playing');
     audio.start();
   }
@@ -257,13 +283,15 @@ export default function IntervalTrainer({ onBack }: Props) {
         state: flash === 'root-ok' || flash === 'correct' ? 'correct' : 'root',
       });
     }
-    // Target
-    const targetPositions = getNotePositions(currentChallenge.targetMidi, STANDARD_BASS_4, 12);
-    if (targetPositions[0]) {
-      highlights.push({
-        string: targetPositions[0].string, fret: targetPositions[0].fret,
-        state: flash === 'correct' ? 'correct' : 'target',
-      });
+    // Target — hidden until the user nails it (or reveals it with a hint)
+    if (flash === 'correct' || revealed) {
+      const targetPositions = getNotePositions(currentChallenge.targetMidi, STANDARD_BASS_4, 12);
+      if (targetPositions[0]) {
+        highlights.push({
+          string: targetPositions[0].string, fret: targetPositions[0].fret,
+          state: flash === 'correct' ? 'correct' : 'target',
+        });
+      }
     }
   }
 
@@ -279,7 +307,8 @@ export default function IntervalTrainer({ onBack }: Props) {
             Hear the <em className="text-primary font-normal italic">interval</em>.
           </h2>
           <p className="text-sm text-zinc-500 mb-12">
-            Play the root note, then the target interval. No time pressure — find it, feel it.
+            Listen to the interval, play the root, then find the target by ear. No time
+            pressure — the target stays hidden until you nail it.
           </p>
 
           <h3 className="text-xs font-mono tracking-widest text-zinc-500 uppercase mb-4">Select Level</h3>
@@ -379,20 +408,34 @@ export default function IntervalTrainer({ onBack }: Props) {
             <div className="text-center">
               <div className={`text-2xl font-semibold transition-colors ${
                 flash === 'correct' ? 'text-green-400' : 'text-amber-400'
-              }`}>{targetInfo.en}</div>
-              <div className="text-sm text-zinc-500">{targetInfo.fr}</div>
+              }`}>{flash === 'correct' || revealed ? targetInfo.en : '?'}</div>
+              <div className="text-sm text-zinc-500">{flash === 'correct' || revealed ? targetInfo.fr : '—'}</div>
             </div>
           </div>
         </div>
 
         {/* Step indicator — constrained */}
-        <div className="w-full max-w-3xl mx-auto px-6 flex justify-center">
+        <div className="w-full max-w-3xl mx-auto px-6 flex flex-col items-center gap-4">
           <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all text-sm ${
             step === 'root' ? 'border-blue-500/50 bg-blue-500/10 text-blue-400' :
             'border-green-500/30 bg-green-500/10 text-green-400'
           }`}>
             <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-            {step === 'root' ? 'Play the root note' : 'Root ✓ — now play the target'}
+            {step === 'root' ? 'Play the root note' : 'Root ✓ — now find the target by ear'}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={playCue}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-800 border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-zinc-100 text-sm transition-all"
+            >
+              <Volume2 size={15} /> Replay interval
+            </button>
+            <button
+              onClick={() => setRevealed(true)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-800 border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-zinc-100 text-sm transition-all"
+            >
+              <Lightbulb size={15} /> Hint
+            </button>
           </div>
         </div>
 

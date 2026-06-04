@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
-import { ArrowLeft, ChevronRight, Lightbulb, Play, X } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Lightbulb, Play, Volume2, X } from 'lucide-react';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../../components/ui/select';
 import Fretboard from '../../components/Fretboard';
 import type { FretHighlight } from '../../components/Fretboard';
@@ -11,6 +11,7 @@ import {
 } from '../../lib/musicTheory';
 import { usePracticeProgress } from './usePracticeProgress';
 import { useAudioInput } from '../../hooks/useAudioInput';
+import { playMidiNote, isNotePlaying, preloadBassSynth } from '../../audio/bassSynth';
 
 interface NoteLevel {
   label: string;
@@ -189,9 +190,21 @@ export default function NoteTrainer({ onBack }: Props) {
     }
   }, [screen, currentIdx, queue.length]);
 
+  // Play the awaited note aloud when a new note appears
+  useEffect(() => {
+    if (screen !== 'playing' || currentMidi === null) return;
+    void playMidiNote(currentMidi, 700);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, currentIdx]);
+
   // Pitch detection → onset detection
   useEffect(() => {
     if (screen !== 'playing' || advancing || currentMidi === null) return;
+    if (isNotePlaying()) {
+      prevMidiRef.current = null;
+      stableFramesRef.current = 0;
+      return;
+    }
     const { midi } = audio.currentPitch;
     if (midi === null) {
       prevMidiRef.current = null;
@@ -223,6 +236,7 @@ export default function NoteTrainer({ onBack }: Props) {
     setAdvancing(false);
     advancingRef.current = false;
     noteStartTimeRef.current = Date.now();
+    preloadBassSynth();
     setScreen('playing');
     audio.start();
   }
@@ -351,6 +365,12 @@ export default function NoteTrainer({ onBack }: Props) {
             {noteInfo.en}
           </div>
           <div className="text-2xl text-zinc-400 font-medium">{noteInfo.fr}</div>
+          <button
+            onClick={() => { if (currentMidi !== null) void playMidiNote(currentMidi, 700); }}
+            className="mt-2 flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-800 border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-zinc-100 text-sm transition-all"
+          >
+            <Volume2 size={15} /> Replay
+          </button>
         </div>
 
         {/* Countdown — constrained */}

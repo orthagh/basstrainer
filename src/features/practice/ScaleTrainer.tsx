@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
-import { ArrowLeft, ChevronRight, Play, X } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Play, Volume2, X } from 'lucide-react';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../../components/ui/select';
 import Fretboard from '../../components/Fretboard';
 import type { FretHighlight } from '../../components/Fretboard';
@@ -15,6 +15,7 @@ import {
 import type { ScalePosition } from '../../lib/musicTheory';
 import { usePracticeProgress } from './usePracticeProgress';
 import { useAudioInput } from '../../hooks/useAudioInput';
+import { playMidiSequence, isNotePlaying, preloadBassSynth } from '../../audio/bassSynth';
 
 interface ScaleLevel {
   label: string;
@@ -290,9 +291,32 @@ export default function ScaleTrainer({ onBack }: Props) {
     }
   }, [screen, runIdx, runs.length]);
 
+  // Play the whole run fast as an ascending preview; reused by the replay button
+  const playPreview = useCallback(() => {
+    if (!currentRun) return;
+    const seen = new Set<number>();
+    const midis = currentRun.notes
+      .map(n => n.midi)
+      .sort((a, b) => a - b)
+      .filter(m => { if (seen.has(m)) return false; seen.add(m); return true; });
+    void playMidiSequence(midis, { noteMs: 160, gapMs: 0 });
+  }, [currentRun]);
+
+  // Auto-play the preview when a new run starts
+  useEffect(() => {
+    if (screen !== 'playing' || !currentRun) return;
+    playPreview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, runIdx]);
+
   // Note detection
   useEffect(() => {
     if (screen !== 'playing' || advancing || !currentRun || currentTargetMidi === null) return;
+    if (isNotePlaying()) {
+      prevMidiRef.current = null;
+      stableFramesRef.current = 0;
+      return;
+    }
     const { midi } = audio.currentPitch;
     if (midi === null) {
       prevMidiRef.current = null;
@@ -338,6 +362,7 @@ export default function ScaleTrainer({ onBack }: Props) {
     setWrongFlash(false);
     setAdvancing(false);
     advancingRef.current = false;
+    preloadBassSynth();
     setScreen('playing');
     audio.start();
   }
@@ -385,7 +410,7 @@ export default function ScaleTrainer({ onBack }: Props) {
             Play the <em className="text-primary font-normal italic">scale</em>.
           </h2>
           <p className="text-sm text-zinc-500 mb-12">
-            All scale dots are shown — navigate them in order without mistakes.
+            Hear the scale played fast, then walk through the dots in order without mistakes.
           </p>
 
           <h3 className="text-xs font-mono tracking-widest text-zinc-500 uppercase mb-4">Select Level</h3>
@@ -493,6 +518,16 @@ export default function ScaleTrainer({ onBack }: Props) {
               'bg-zinc-700'
             }`} />
           ))}
+        </div>
+
+        {/* Replay preview — constrained */}
+        <div className="w-full max-w-3xl mx-auto px-6 pt-3 flex justify-center">
+          <button
+            onClick={playPreview}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-zinc-800 border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-zinc-100 text-sm transition-all"
+          >
+            <Volume2 size={15} /> Replay scale
+          </button>
         </div>
 
         {/* Fretboard — full width */}
